@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from "../../components/ui/button"
 import { Home, Zap, MoreVertical, Camera, Video, RefreshCcw, X, Check } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { uploadPhoto, deletePhoto } from '../../services/firebaseService'
 
 type CaptureMode = 'photo' | 'video'
 
@@ -15,6 +16,7 @@ export default function CameraPage() {
   const [isFrontCamera, setIsFrontCamera] = useState(false)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -160,13 +162,37 @@ export default function CameraPage() {
     setIsFrontCamera(prev => !prev)
   }
 
-  const retakePhoto = () => {
-    setCapturedImage(null)
+  const proceedToEditing = async () => {
+    if (capturedImage) {
+      setIsUploading(true)
+      try {
+        const fileName = `photo_${Date.now()}.jpg`
+        const downloadUrl = await uploadPhoto(capturedImage, fileName)
+        console.log('Photo uploaded successfully. Download URL:', downloadUrl)
+        // Here you would typically navigate to the editing screen
+        // and pass the downloadUrl or fileName for further processing
+      } catch (error) {
+        console.error('Error uploading photo:', error)
+        // Handle the error (e.g., show an error message to the user)
+      } finally {
+        setIsUploading(false)
+      }
+    }
   }
 
-  const proceedToEditing = () => {
-    // Implement navigation to editing screen
-    console.log('Proceed to editing with image:', capturedImage)
+  const retakePhoto = async () => {
+    if (capturedImage) {
+      try {
+        // Assuming the file name is stored somewhere or can be derived from the capturedImage
+        const fileName = `photo_${Date.now()}.jpg` // This should be the actual file name used during upload
+        await deletePhoto(fileName)
+        console.log('Photo deleted successfully')
+      } catch (error) {
+        console.error('Error deleting photo:', error)
+        // Handle the error (e.g., show an error message to the user)
+      }
+    }
+    setCapturedImage(null)
   }
 
   if (hasPermission === false) {
@@ -272,12 +298,21 @@ export default function CameraPage() {
           animate={{ y: 0 }}
           transition={{ delay: 0.2, type: 'spring', stiffness: 120 }}
         >
-          <Button variant="outline" size="icon" onClick={retakePhoto}>
+          <Button variant="outline" size="icon" onClick={retakePhoto} disabled={isUploading}>
             <X className="h-6 w-6" />
             <span className="sr-only">Retake</span>
           </Button>
-          <Button variant="outline" size="icon" onClick={proceedToEditing}>
-            <Check className="h-6 w-6" />
+          <Button variant="outline" size="icon" onClick={proceedToEditing} disabled={isUploading}>
+            {isUploading ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+              >
+                <RefreshCcw className="h-6 w-6" />
+              </motion.div>
+            ) : (
+              <Check className="h-6 w-6" />
+            )}
             <span className="sr-only">Proceed</span>
           </Button>
         </motion.div>
