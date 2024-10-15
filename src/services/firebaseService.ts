@@ -1,5 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getStorage, ref, uploadString, getDownloadURL, deleteObject, listAll, StorageReference } from 'firebase/storage';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, User } from 'firebase/auth';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -14,6 +16,28 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const storage = getStorage(app);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+export const signUp = async (email: string, password: string, username: string): Promise<void> => {
+  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  await setDoc(doc(db, 'users', userCredential.user.uid), {
+    username,
+    email
+  });
+};
+
+export const signIn = async (email: string, password: string): Promise<void> => {
+  await signInWithEmailAndPassword(auth, email, password);
+};
+
+export const signOut = async (): Promise<void> => {
+  await firebaseSignOut(auth);
+};
+
+export const onAuthStateChange = (callback: (user: User | null) => void): () => void => {
+  return onAuthStateChanged(auth, callback);
+};
 
 export const uploadPhoto = async (photoDataUrl: string, fileName: string): Promise<string> => {
   const storageRef = ref(storage, `photos/${fileName}`);
