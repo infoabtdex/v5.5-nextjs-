@@ -2,9 +2,12 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from "../../components/ui/button"
-import { Home, Zap, MoreVertical, Camera, Video, RefreshCcw, X, Check } from 'lucide-react'
+import { Image, Zap, RefreshCcw, Camera, Video, X, Check, Settings, User, LogOut } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { uploadPhoto, deletePhoto } from '../../services/firebaseService'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { logout } from '../../services/firebaseService'
 
 type CaptureMode = 'photo' | 'video'
 
@@ -17,10 +20,12 @@ export default function CameraPage() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const router = useRouter()
 
   useEffect(() => {
     requestCameraPermission()
@@ -195,6 +200,19 @@ export default function CameraPage() {
     setCapturedImage(null)
   }
 
+  const toggleSettings = () => {
+    setIsSettingsOpen(!isSettingsOpen)
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.push('/auth/login-signup')
+    } catch (error) {
+      console.error('Error logging out:', error)
+    }
+  }
+
   if (hasPermission === false) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-black text-white">
@@ -233,25 +251,62 @@ export default function CameraPage() {
         animate={{ y: 0 }}
         transition={{ delay: 0.2, type: 'spring', stiffness: 120 }}
       >
-        <Button variant="ghost" size="icon">
-          <Home className="h-6 w-6" />
-          <span className="sr-only">Return Home</span>
-        </Button>
-        <AnimatePresence>
-          {isFlashOn && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0 }}
-              className="absolute inset-0 bg-white bg-opacity-20"
-            />
-          )}
-        </AnimatePresence>
         <Button variant="ghost" size="icon" onClick={toggleFlash}>
           <Zap className={`h-6 w-6 ${isFlashOn ? 'text-yellow-300' : 'text-white'}`} />
           <span className="sr-only">Toggle Flash</span>
         </Button>
-        <Button variant="ghost" size="icon" onClick={switchCamera}>
+        <Button variant="ghost" size="icon" onClick={toggleSettings}>
+          <Settings className="h-6 w-6" />
+          <span className="sr-only">Settings</span>
+        </Button>
+      </motion.div>
+
+      {/* Settings Menu */}
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <motion.div
+            className="absolute top-14 right-4 bg-black bg-opacity-75 rounded-lg p-2"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <Link href="/profile">
+              <Button variant="ghost" className="w-full justify-start">
+                <User className="mr-2 h-4 w-4" />
+                Profile
+              </Button>
+            </Link>
+            <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Gallery Button (Bottom Left) */}
+      <motion.div 
+        className="absolute bottom-4 left-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Link href="/gallery">
+          <Button variant="ghost" size="icon" className="bg-black bg-opacity-50 hover:bg-opacity-75">
+            <Image className="h-6 w-6" />
+            <span className="sr-only">Go to Gallery</span>
+          </Button>
+        </Link>
+      </motion.div>
+
+      {/* Camera Switch Button (Bottom Right) */}
+      <motion.div 
+        className="absolute bottom-4 right-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Button variant="ghost" size="icon" onClick={switchCamera} className="bg-black bg-opacity-50 hover:bg-opacity-75">
           <RefreshCcw className="h-6 w-6" />
           <span className="sr-only">Switch Camera</span>
         </Button>

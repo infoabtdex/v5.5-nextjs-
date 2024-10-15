@@ -30,7 +30,7 @@ export default function LoginSignup() {
       } else {
         await signUp(email, password, username)
       }
-      router.push('/') // Redirect to home page after successful login/signup
+      router.push('/camera') // Redirect to camera page after successful login/signup
     } catch (error: any) {
       setError(error.message || 'An error occurred')
     }

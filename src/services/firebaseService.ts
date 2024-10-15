@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getStorage, ref, uploadString, getDownloadURL, deleteObject, listAll, StorageReference } from 'firebase/storage';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, User } from 'firebase/auth';
-import { getFirestore, doc, setDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -61,3 +61,29 @@ export const getAllPhotos = async (): Promise<string[]> => {
   const urls = await Promise.all(result.items.map((itemRef: StorageReference) => getDownloadURL(itemRef)));
   return urls;
 };
+
+export const logout = async () => {
+  const auth = getAuth()
+  await signOut(auth)
+}
+
+export const getUserProfile = async () => {
+  const auth = getAuth()
+  const user = auth.currentUser
+  if (!user) throw new Error('No user logged in')
+
+  const db = getFirestore()
+  const userDoc = await getDoc(doc(db, 'users', user.uid))
+  if (!userDoc.exists()) throw new Error('User profile not found')
+
+  return userDoc.data() as { username: string; email: string }
+}
+
+export const updateUserProfile = async (profile: { username: string; email: string }) => {
+  const auth = getAuth()
+  const user = auth.currentUser
+  if (!user) throw new Error('No user logged in')
+
+  const db = getFirestore()
+  await updateDoc(doc(db, 'users', user.uid), profile)
+}

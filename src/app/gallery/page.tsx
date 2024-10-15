@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useCallback } from 'react'
-import { ChevronRight, ChevronDown } from 'lucide-react'
+import { ChevronRight, ChevronDown, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from "../../components/ui/button"
 
@@ -143,6 +143,12 @@ function GalleryPage() {
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       <div className="flex justify-between items-center mb-4">
+        <Link href="/camera" passHref>
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-6 w-6" />
+            <span className="sr-only">Back to Camera</span>
+          </Button>
+        </Link>
         <h1 className="text-2xl font-bold">Gallery</h1>
         <Link href={`/create-post?photos=${selectedPhotos.join(',')}`} passHref>
           <Button disabled={selectedPhotos.length === 0}>

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Navigation from './Navigation'
 import { onAuthStateChange, signOut } from '../services/firebaseService'
 import { User } from 'firebase/auth'
 
@@ -30,7 +29,6 @@ const AuthWrapper = ({ children }: { children: React.ReactNode }) => {
   return (
     <>
       {children}
-      {user && <Navigation user={user} onLogout={handleLogout} />}
     </>
   );
 };

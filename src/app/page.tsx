@@ -17,9 +17,6 @@ export default function Home() {
           <Link href="/gallery" className="block bg-green-500 text-white p-2 rounded text-center">
             View Gallery
           </Link>
-          <Link href="/create-post" className="block bg-purple-500 text-white p-2 rounded text-center">
-            Create New Post
-          </Link>
         </div>
       </div>
     </ProtectedRoute>
