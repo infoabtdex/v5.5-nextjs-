@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from "../../components/ui/button"
 import { Image, Zap, RefreshCcw, Camera, Video, X, Check, Settings, User, LogOut } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { uploadPhoto, deletePhoto } from '../../services/firebaseService'
+import { uploadPhoto, uploadVideo, deletePhoto, deleteVideo } from '../../services/firebaseService'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { logout } from '../../services/firebaseService'
@@ -13,7 +13,6 @@ type CaptureMode = 'photo' | 'video'
 
 export default function CameraPage() {
   const [cameraMode, setCameraMode] = useState<CaptureMode>('photo')
-  const [startX, setStartX] = useState(0)
   const [isFlashOn, setIsFlashOn] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [isFrontCamera, setIsFrontCamera] = useState(false)
@@ -26,6 +25,9 @@ export default function CameraPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const router = useRouter()
+  const [capturedVideo, setCapturedVideo] = useState<string | null>(null)
+  const [videoBlob, setVideoBlob] = useState<Blob | null>(null)
+  const [startX, setStartX] = useState<number>(0)
 
   useEffect(() => {
     requestCameraPermission()
@@ -135,8 +137,8 @@ export default function CameraPage() {
       mediaRecorderRef.current.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'video/webm' })
         const videoUrl = URL.createObjectURL(blob)
-        console.log('Video recorded:', videoUrl)
-        // Here you would typically save or process the video
+        setCapturedVideo(videoUrl)
+        setVideoBlob(blob)
       }
 
       mediaRecorderRef.current.start()
@@ -174,30 +176,34 @@ export default function CameraPage() {
         const fileName = `photo_${Date.now()}.jpg`
         const downloadUrl = await uploadPhoto(capturedImage, fileName)
         console.log('Photo uploaded successfully. Download URL:', downloadUrl)
-        // Here you would typically navigate to the editing screen
-        // and pass the downloadUrl or fileName for further processing
+        router.push('/gallery')
       } catch (error) {
         console.error('Error uploading photo:', error)
-        // Handle the error (e.g., show an error message to the user)
+      } finally {
+        setIsUploading(false)
+      }
+    } else if (capturedVideo && videoBlob) {
+      setIsUploading(true)
+      try {
+        const fileName = `video_${Date.now()}.webm`
+        const downloadUrl = await uploadVideo(videoBlob, fileName)
+        console.log('Video uploaded successfully. Download URL:', downloadUrl)
+        router.push('/gallery')
+      } catch (error) {
+        console.error('Error uploading video:', error)
       } finally {
         setIsUploading(false)
       }
     }
   }
 
-  const retakePhoto = async () => {
+  const retakeMedia = async () => {
     if (capturedImage) {
-      try {
-        // Assuming the file name is stored somewhere or can be derived from the capturedImage
-        const fileName = `photo_${Date.now()}.jpg` // This should be the actual file name used during upload
-        await deletePhoto(fileName)
-        console.log('Photo deleted successfully')
-      } catch (error) {
-        console.error('Error deleting photo:', error)
-        // Handle the error (e.g., show an error message to the user)
-      }
+      setCapturedImage(null)
+    } else if (capturedVideo) {
+      setCapturedVideo(null)
+      setVideoBlob(null)
     }
-    setCapturedImage(null)
   }
 
   const toggleSettings = () => {
@@ -213,6 +219,10 @@ export default function CameraPage() {
     }
   }
 
+  const switchMode = (mode: CaptureMode) => {
+    setCameraMode(mode)
+  }
+
   if (hasPermission === false) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-black text-white">
@@ -224,8 +234,6 @@ export default function CameraPage() {
   return (
     <motion.div 
       className="h-screen w-full relative bg-black text-white overflow-hidden"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -284,38 +292,10 @@ export default function CameraPage() {
         )}
       </AnimatePresence>
 
-      {/* Gallery Button (Bottom Left) */}
-      <motion.div 
-        className="absolute bottom-4 left-4"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <Link href="/gallery">
-          <Button variant="ghost" size="icon" className="bg-black bg-opacity-50 hover:bg-opacity-75">
-            <Image className="h-6 w-6" />
-            <span className="sr-only">Go to Gallery</span>
-          </Button>
-        </Link>
-      </motion.div>
-
-      {/* Camera Switch Button (Bottom Right) */}
-      <motion.div 
-        className="absolute bottom-4 right-4"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <Button variant="ghost" size="icon" onClick={switchCamera} className="bg-black bg-opacity-50 hover:bg-opacity-75">
-          <RefreshCcw className="h-6 w-6" />
-          <span className="sr-only">Switch Camera</span>
-        </Button>
-      </motion.div>
-
       {/* Capture Button */}
       {!capturedImage && (
         <motion.div 
-          className="absolute bottom-10 left-0 right-0 flex justify-center"
+          className="absolute bottom-20 left-0 right-0 flex justify-center"
           initial={{ y: 50 }}
           animate={{ y: 0 }}
           transition={{ delay: 0.2, type: 'spring', stiffness: 120 }}
@@ -345,15 +325,65 @@ export default function CameraPage() {
         </motion.div>
       )}
 
+      {/* Mode Selector */}
+      {!capturedImage && (
+        <motion.div 
+          className="absolute bottom-4 left-0 right-0 flex justify-center space-x-8"
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          <button
+            className={`text-sm ${cameraMode === 'photo' ? 'font-bold text-white' : 'text-gray-400'}`}
+            onClick={() => switchMode('photo')}
+          >
+            Photo
+          </button>
+          <button
+            className={`text-sm ${cameraMode === 'video' ? 'font-bold text-white' : 'text-gray-400'}`}
+            onClick={() => switchMode('video')}
+          >
+            Video
+          </button>
+        </motion.div>
+      )}
+
+      {/* Gallery and Camera Switch Buttons */}
+      <motion.div 
+        className="absolute bottom-4 left-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Link href="/gallery">
+          <Button variant="ghost" size="icon" className="bg-black bg-opacity-50 hover:bg-opacity-75">
+            <Image className="h-6 w-6" />
+            <span className="sr-only">Go to Gallery</span>
+          </Button>
+        </Link>
+      </motion.div>
+
+      <motion.div 
+        className="absolute bottom-4 right-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Button variant="ghost" size="icon" onClick={switchCamera} className="bg-black bg-opacity-50 hover:bg-opacity-75">
+          <RefreshCcw className="h-6 w-6" />
+          <span className="sr-only">Switch Camera</span>
+        </Button>
+      </motion.div>
+
       {/* Preview Controls */}
-      {capturedImage && (
+      {(capturedImage || capturedVideo) && (
         <motion.div 
           className="absolute bottom-10 left-0 right-0 flex justify-center space-x-4"
           initial={{ y: 50 }}
           animate={{ y: 0 }}
           transition={{ delay: 0.2, type: 'spring', stiffness: 120 }}
         >
-          <Button variant="outline" size="icon" onClick={retakePhoto} disabled={isUploading}>
+          <Button variant="outline" size="icon" onClick={retakeMedia} disabled={isUploading}>
             <X className="h-6 w-6" />
             <span className="sr-only">Retake</span>
           </Button>
@@ -370,29 +400,6 @@ export default function CameraPage() {
             )}
             <span className="sr-only">Proceed</span>
           </Button>
-        </motion.div>
-      )}
-
-      {/* Mode Indicator */}
-      {!capturedImage && (
-        <motion.div 
-          className="absolute bottom-4 left-0 right-0 flex justify-center space-x-4"
-          initial={{ y: 50 }}
-          animate={{ y: 0 }}
-          transition={{ delay: 0.3, type: 'spring', stiffness: 120 }}
-        >
-          <motion.span 
-            className={`text-sm ${cameraMode === 'photo' ? 'font-bold' : ''}`}
-            animate={{ scale: cameraMode === 'photo' ? 1.1 : 1 }}
-          >
-            Photo
-          </motion.span>
-          <motion.span 
-            className={`text-sm ${cameraMode === 'video' ? 'font-bold' : ''}`}
-            animate={{ scale: cameraMode === 'video' ? 1.1 : 1 }}
-          >
-            Video
-          </motion.span>
         </motion.div>
       )}
 

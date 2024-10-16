@@ -1,11 +1,12 @@
 import React from 'react'
 import Image from 'next/image'
 import { Button } from "@/components/ui/button"
-import { Trash2, Edit2, Share2 } from 'lucide-react'
+import { Trash2, Edit2, Share2, Play } from 'lucide-react'
 
 interface PhotoCardProps {
   src: string
   alt: string
+  type: 'photo' | 'video'
   isSelectable: boolean
   isSelected: boolean
   onSelect: () => void
@@ -18,6 +19,7 @@ interface PhotoCardProps {
 const PhotoCard: React.FC<PhotoCardProps> = ({
   src,
   alt,
+  type,
   isSelectable,
   isSelected,
   onSelect,
@@ -29,17 +31,28 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
   return (
     <div className="relative group" onClick={onClick}>
       <div className={`aspect-square overflow-hidden rounded-lg ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
-        <Image
-          src={src}
-          alt={alt}
-          width={300}
-          height={300}
-          className="object-cover w-full h-full transition-opacity duration-300 ease-in-out group-hover:opacity-75"
-          loading="lazy"
-          onError={(e) => {
-            e.currentTarget.src = '/placeholder.svg?height=300&width=300' // Fallback image
-          }}
-        />
+        {type === 'photo' ? (
+          <Image
+            src={src}
+            alt={alt}
+            width={300}
+            height={300}
+            className="object-cover w-full h-full transition-opacity duration-300 ease-in-out group-hover:opacity-75"
+            loading="lazy"
+          />
+        ) : (
+          <div className="relative w-full h-full">
+            <video
+              src={src}
+              className="object-cover w-full h-full"
+              muted
+              playsInline
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Play className="w-12 h-12 text-white opacity-75" />
+            </div>
+          </div>
+        )}
       </div>
       {isSelectable && (
         <button

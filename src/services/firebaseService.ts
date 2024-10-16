@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getStorage, ref, uploadString, getDownloadURL, deleteObject, listAll, StorageReference, getMetadata } from 'firebase/storage';
+import { getStorage, ref, uploadString, uploadBytes, getDownloadURL, deleteObject, listAll, StorageReference, getMetadata } from 'firebase/storage';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, User } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, enableIndexedDbPersistence } from 'firebase/firestore';
 
@@ -118,4 +118,46 @@ export const updateUserProfile = async (profile: { username: string; email: stri
 
   const db = getFirestore();
   await updateDoc(doc(db, 'users', user.uid), profile);
+};
+
+export const uploadVideo = async (videoBlob: Blob, fileName: string): Promise<string> => {
+  const storageRef = ref(storage, `videos/${fileName}`);
+  await uploadBytes(storageRef, videoBlob);
+  return await getDownloadURL(storageRef);
+};
+
+export const deleteVideo = async (fileName: string): Promise<void> => {
+  const storageRef = ref(storage, `videos/${fileName}`);
+  await deleteObject(storageRef);
+};
+
+export const getAllMedia = async (): Promise<{ id: string; src: string; type: 'photo' | 'video'; date: Date }[]> => {
+  const photoStorageRef = ref(storage, 'photos');
+  const videoStorageRef = ref(storage, 'videos');
+  const [photoResult, videoResult] = await Promise.all([listAll(photoStorageRef), listAll(videoStorageRef)]);
+  
+  const photoPromises = photoResult.items.map(async (itemRef: StorageReference) => {
+    const url = await getDownloadURL(itemRef);
+    const metadata = await getMetadata(itemRef);
+    return {
+      id: itemRef.name,
+      src: url,
+      type: 'photo' as const,
+      date: new Date(metadata.timeCreated)
+    };
+  });
+
+  const videoPromises = videoResult.items.map(async (itemRef: StorageReference) => {
+    const url = await getDownloadURL(itemRef);
+    const metadata = await getMetadata(itemRef);
+    return {
+      id: itemRef.name,
+      src: url,
+      type: 'video' as const,
+      date: new Date(metadata.timeCreated)
+    };
+  });
+
+  const allMedia = await Promise.all([...photoPromises, ...videoPromises]);
+  return allMedia.sort((a, b) => b.date.getTime() - a.date.getTime());
 };
