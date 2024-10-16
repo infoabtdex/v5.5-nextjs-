@@ -1,7 +1,7 @@
-import React from 'react'
+import React, { useState } from 'react'
 import Image from 'next/image'
 import { Button } from "@/components/ui/button"
-import { Trash2, Edit2, Share2, Play } from 'lucide-react'
+import { Trash2, Edit2, Share2, Play, Pause } from 'lucide-react'
 
 interface PhotoCardProps {
   src: string
@@ -28,6 +28,17 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
   onShare,
   onClick
 }) => {
+  const [isPlaying, setIsPlaying] = useState(false)
+
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsPlaying(!isPlaying)
+    const video = document.getElementById(`video-${alt}`) as HTMLVideoElement
+    if (video) {
+      isPlaying ? video.pause() : video.play()
+    }
+  }
+
   return (
     <div className="relative group" onClick={onClick}>
       <div className={`aspect-square overflow-hidden rounded-lg ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
@@ -43,13 +54,22 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
         ) : (
           <div className="relative w-full h-full">
             <video
+              id={`video-${alt}`}
               src={src}
               className="object-cover w-full h-full"
               muted
               playsInline
+              loop
             />
             <div className="absolute inset-0 flex items-center justify-center">
-              <Play className="w-12 h-12 text-white opacity-75" />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="bg-black bg-opacity-50 hover:bg-opacity-75"
+                onClick={togglePlay}
+              >
+                {isPlaying ? <Pause className="h-8 w-8 text-white" /> : <Play className="h-8 w-8 text-white" />}
+              </Button>
             </div>
           </div>
         )}

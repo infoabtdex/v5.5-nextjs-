@@ -12,37 +12,41 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import Image from 'next/image'
-import { getPhotoUrl } from '@/services/firebaseService'
+import { getMediaUrl } from '@/services/firebaseService'
 
-interface Photo {
+interface Media {
   id: string
   src: string
+  type: 'photo' | 'video'
 }
 
 export default function CreatePostPage() {
   const searchParams = useSearchParams()
-  const [selectedPhotos, setSelectedPhotos] = useState<Photo[]>([])
+  const [selectedMedia, setSelectedMedia] = useState<Media[]>([])
   const [step, setStep] = useState<'enhance' | 'caption'>('enhance')
   const [enhancedVersions, setEnhancedVersions] = useState<string[][]>([])
   const [selectedVersions, setSelectedVersions] = useState<string[]>([])
   const [caption, setCaption] = useState('')
 
   useEffect(() => {
-    const fetchPhotos = async () => {
-      const photoIds = searchParams.get('photos')?.split(',') || []
-      const photos = await Promise.all(
-        photoIds.map(async (id) => ({
+    const fetchMedia = async () => {
+      const mediaIds = searchParams.get('media')?.split(',') || []
+      const media = await Promise.all(
+        mediaIds.map(async (id): Promise<Media> => ({
           id,
-          src: await getPhotoUrl(id)
+          src: await getMediaUrl(id),
+          type: id.startsWith('photo_') ? 'photo' : 'video'
         }))
       )
-      setSelectedPhotos(photos)
-      // For now, we'll use the original images as "enhanced" versions
-      const enhanced = photos.map(photo => [photo.src, photo.src, photo.src])
+      setSelectedMedia(media)
+      // Simulate AI enhancement for photos only
+      const enhanced = media.map(item => 
+        item.type === 'photo' ? [item.src, item.src, item.src] : [item.src]
+      )
       setEnhancedVersions(enhanced)
       setSelectedVersions(enhanced.map(versions => versions[0]))
     }
-    fetchPhotos()
+    fetchMedia()
   }, [searchParams])
 
   const handleRegenerateVersion = (imageIndex: number, versionIndex: number) => {
@@ -64,40 +68,50 @@ export default function CreatePostPage() {
         return (
           <div>
             <h2 className="text-xl font-bold mb-4">Choose Enhanced Versions</h2>
-            {selectedPhotos.map((photo, imageIndex) => (
-              <div key={photo.id} className="mb-6">
-                <h3 className="text-lg font-semibold mb-2">Image {imageIndex + 1}</h3>
-                <div className="mb-2 flex justify-center">
-                  <Image
-                    src={photo.src}
-                    alt={`Original image ${imageIndex + 1}`}
-                    width={200}
-                    height={200}
-                    className="rounded-lg object-cover"
-                  />
+            {selectedMedia.map((media, mediaIndex) => (
+              <div key={media.id} className="mb-6">
+                <h3 className="text-lg font-semibold mb-2">Media {mediaIndex + 1}</h3>
+                <div className="mb-2">
+                  {media.type === 'photo' ? (
+                    <Image
+                      src={media.src}
+                      alt={`Original media ${mediaIndex + 1}`}
+                      width={200}
+                      height={200}
+                      className="rounded-lg object-cover"
+                    />
+                  ) : (
+                    <video
+                      src={media.src}
+                      className="w-full max-w-[200px] rounded-lg"
+                      controls
+                    />
+                  )}
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {enhancedVersions[imageIndex].map((version, versionIndex) => (
-                    <div key={versionIndex} className="relative">
-                      <button
-                        className={`relative w-full aspect-square overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                          selectedVersions[imageIndex] === version ? 'ring-2 ring-blue-500' : ''
-                        }`}
-                        onClick={() => handleVersionSelect(imageIndex, version)}
-                      >
-                        <Image src={version} alt={`Enhanced version ${versionIndex + 1}`} layout="fill" objectFit="cover" />
-                      </button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="absolute top-1 right-1 bg-black bg-opacity-50"
-                        onClick={() => handleRegenerateVersion(imageIndex, versionIndex)}
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                {media.type === 'photo' && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {enhancedVersions[mediaIndex].map((version, versionIndex) => (
+                      <div key={versionIndex} className="relative">
+                        <button
+                          className={`relative w-full aspect-square overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                            selectedVersions[mediaIndex] === version ? 'ring-2 ring-blue-500' : ''
+                          }`}
+                          onClick={() => handleVersionSelect(mediaIndex, version)}
+                        >
+                          <Image src={version} alt={`Enhanced version ${versionIndex + 1}`} layout="fill" objectFit="cover" />
+                        </button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="absolute top-1 right-1 bg-black bg-opacity-50"
+                          onClick={() => handleRegenerateVersion(mediaIndex, versionIndex)}
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
             <Button className="w-full mt-4" onClick={() => setStep('caption')}>
@@ -110,15 +124,24 @@ export default function CreatePostPage() {
           <div>
             <h2 className="text-xl font-bold mb-4">Add Caption</h2>
             <div className="grid grid-cols-2 gap-2 mb-4">
-              {selectedPhotos.map((photo, index) => (
-                <div key={photo.id} className="relative aspect-square">
-                  <Image
-                    src={selectedVersions[index] || photo.src}
-                    alt={`Selected image ${index + 1}`}
-                    layout="fill"
-                    objectFit="cover"
-                    className="rounded-lg"
-                  />
+              {selectedMedia.map((media, index) => (
+                <div key={media.id} className="relative aspect-square">
+                  {media.type === 'photo' ? (
+                    <Image
+                      src={selectedVersions[index] || media.src}
+                      alt={`Selected media ${index + 1}`}
+                      layout="fill"
+                      objectFit="cover"
+                      className="rounded-lg"
+                    />
+                  ) : (
+                    <video
+                      src={media.src}
+                      className="w-full h-full rounded-lg object-cover"
+                      muted
+                      playsInline
+                    />
+                  )}
                 </div>
               ))}
             </div>

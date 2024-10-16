@@ -81,7 +81,7 @@ export const getAllPhotos = async (): Promise<{ id: string; src: string; date: D
 
 export const logout = async () => {
   const auth = getAuth()
-  await signOut(auth)
+  await firebaseSignOut(auth)
 }
 
 export const getUserProfile = async (): Promise<{ username: string; email: string } | null> => {
@@ -160,4 +160,11 @@ export const getAllMedia = async (): Promise<{ id: string; src: string; type: 'p
 
   const allMedia = await Promise.all([...photoPromises, ...videoPromises]);
   return allMedia.sort((a, b) => b.date.getTime() - a.date.getTime());
+};
+
+export const getMediaUrl = async (fileName: string): Promise<string> => {
+  const isPhoto = fileName.startsWith('photo_');
+  const folder = isPhoto ? 'photos' : 'videos';
+  const storageRef = ref(storage, `${folder}/${fileName}`);
+  return await getDownloadURL(storageRef);
 };

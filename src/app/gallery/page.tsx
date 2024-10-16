@@ -184,12 +184,21 @@ export default function GalleryPage() {
       {expandedMedia && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
           <div className="relative w-full h-full max-w-4xl max-h-4xl">
-            <Image
-              src={expandedMedia.src}
-              alt={`Expanded media ${expandedMedia.id}`}
-              layout="fill"
-              objectFit="contain"
-            />
+            {expandedMedia.type === 'photo' ? (
+              <Image
+                src={expandedMedia.src}
+                alt={`Expanded media ${expandedMedia.id}`}
+                layout="fill"
+                objectFit="contain"
+              />
+            ) : (
+              <video
+                src={expandedMedia.src}
+                className="w-full h-full object-contain"
+                controls
+                autoPlay
+              />
+            )}
             <button
               className="absolute top-4 right-4 text-white"
               onClick={() => setExpandedMedia(null)}
