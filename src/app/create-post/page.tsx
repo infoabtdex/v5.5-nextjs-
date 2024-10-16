@@ -11,36 +11,43 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import Image from 'next/image'
+import { getPhotoUrl } from '@/services/firebaseService'
+
+interface Photo {
+  id: string
+  src: string
+}
 
 export default function CreatePostPage() {
   const searchParams = useSearchParams()
-  const [selectedPhotos, setSelectedPhotos] = useState<string[]>([])
+  const [selectedPhotos, setSelectedPhotos] = useState<Photo[]>([])
   const [step, setStep] = useState<'enhance' | 'caption'>('enhance')
   const [enhancedVersions, setEnhancedVersions] = useState<string[][]>([])
   const [selectedVersions, setSelectedVersions] = useState<string[]>([])
   const [caption, setCaption] = useState('')
 
   useEffect(() => {
-    const photos = searchParams.get('photos')
-    if (photos) {
-      setSelectedPhotos(photos.split(','))
-      // Simulate AI enhancement
-      const enhanced = photos.split(',').map(() => [
-        '/placeholder.svg?height=400&width=400',
-        '/placeholder.svg?height=400&width=400',
-        '/placeholder.svg?height=400&width=400',
-      ])
+    const fetchPhotos = async () => {
+      const photoIds = searchParams.get('photos')?.split(',') || []
+      const photos = await Promise.all(
+        photoIds.map(async (id) => ({
+          id,
+          src: await getPhotoUrl(id)
+        }))
+      )
+      setSelectedPhotos(photos)
+      // For now, we'll use the original images as "enhanced" versions
+      const enhanced = photos.map(photo => [photo.src, photo.src, photo.src])
       setEnhancedVersions(enhanced)
       setSelectedVersions(enhanced.map(versions => versions[0]))
     }
+    fetchPhotos()
   }, [searchParams])
 
   const handleRegenerateVersion = (imageIndex: number, versionIndex: number) => {
-    setEnhancedVersions(prev => {
-      const newVersions  = [...prev]
-      newVersions[imageIndex][versionIndex] = `/placeholder.svg?height=400&width=400&regenerated=${Date.now()}`
-      return newVersions
-    })
+    // In a real app, this would trigger AI enhancement
+    console.log(`Regenerating version ${versionIndex} for image ${imageIndex}`)
   }
 
   const handleVersionSelect = (imageIndex: number, version: string) => {
@@ -57,19 +64,28 @@ export default function CreatePostPage() {
         return (
           <div>
             <h2 className="text-xl font-bold mb-4">Choose Enhanced Versions</h2>
-            {enhancedVersions.map((versions, imageIndex) => (
-              <div key={imageIndex} className="mb-6">
+            {selectedPhotos.map((photo, imageIndex) => (
+              <div key={photo.id} className="mb-6">
                 <h3 className="text-lg font-semibold mb-2">Image {imageIndex + 1}</h3>
+                <div className="mb-2 flex justify-center">
+                  <Image
+                    src={photo.src}
+                    alt={`Original image ${imageIndex + 1}`}
+                    width={200}
+                    height={200}
+                    className="rounded-lg object-cover"
+                  />
+                </div>
                 <div className="grid grid-cols-3 gap-2">
-                  {versions.map((version, versionIndex) => (
+                  {enhancedVersions[imageIndex].map((version, versionIndex) => (
                     <div key={versionIndex} className="relative">
                       <button
-                        className={`relative aspect-square overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        className={`relative w-full aspect-square overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                           selectedVersions[imageIndex] === version ? 'ring-2 ring-blue-500' : ''
                         }`}
                         onClick={() => handleVersionSelect(imageIndex, version)}
                       >
-                        <img src={version} alt={`Enhanced version ${versionIndex + 1}`} className="object-cover w-full h-full" />
+                        <Image src={version} alt={`Enhanced version ${versionIndex + 1}`} layout="fill" objectFit="cover" />
                       </button>
                       <Button
                         size="icon"
@@ -93,9 +109,17 @@ export default function CreatePostPage() {
         return (
           <div>
             <h2 className="text-xl font-bold mb-4">Add Caption</h2>
-            <div className="flex space-x-2 mb-4 overflow-x-auto">
-              {selectedVersions.map((version, index) => (
-                <img key={index} src={version} alt={`Selected image ${index + 1}`} className="w-20 h-20 object-cover rounded-lg" />
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {selectedPhotos.map((photo, index) => (
+                <div key={photo.id} className="relative aspect-square">
+                  <Image
+                    src={selectedVersions[index] || photo.src}
+                    alt={`Selected image ${index + 1}`}
+                    layout="fill"
+                    objectFit="cover"
+                    className="rounded-lg"
+                  />
+                </div>
               ))}
             </div>
             <Textarea
@@ -131,7 +155,7 @@ export default function CreatePostPage() {
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={() => setStep('enhance')}
+            onClick={() => step === 'caption' ? setStep('enhance') : window.history.back()}
           >
             <ChevronLeft className="h-6 w-6" />
             <span className="sr-only">Back</span>
