@@ -1,44 +1,23 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from "../../components/ui/button"
-import { Input } from "../../components/ui/input"
-import { Label } from "../../components/ui/label"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { ArrowLeft, User } from 'lucide-react'
 import Link from 'next/link'
-import { getUserProfile, updateUserProfile } from '../../services/firebaseService'
-
-interface UserProfile {
-  username: string
-  email: string
-}
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isEditing, setIsEditing] = useState(false)
-  const [username, setUsername] = useState('')
+  const [username, setUsername] = useState('John Doe')
+  const [email, setEmail] = useState('johndoe@example.com')
   const router = useRouter()
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      const userProfile = await getUserProfile()
-      setProfile(userProfile)
-      setUsername(userProfile.username)
-    }
-    fetchProfile()
-  }, [])
-
-  const handleSave = async () => {
-    if (profile) {
-      await updateUserProfile({ ...profile, username })
-      setProfile({ ...profile, username })
-      setIsEditing(false)
-    }
-  }
-
-  if (!profile) {
-    return <div>Loading...</div>
+  const handleSave = () => {
+    setIsEditing(false)
+    // In a real app, you would save the changes to the backend here
+    console.log('Saving profile:', { username, email })
   }
 
   return (
@@ -59,26 +38,32 @@ export default function ProfilePage() {
         <div className="space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>
-            <Input id="email" value={profile.email} disabled />
+            <Input 
+              id="email" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={!isEditing} 
+            />
           </div>
           <div>
             <Label htmlFor="username">Username</Label>
-            {isEditing ? (
-              <Input
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-            ) : (
-              <Input id="username" value={profile.username} disabled />
-            )}
+            <Input 
+              id="username" 
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              disabled={!isEditing}
+            />
           </div>
         </div>
         <div className="mt-6">
           {isEditing ? (
             <div className="space-x-2">
-              <Button onClick={handleSave}>Save</Button>
-              <Button variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
+              <Button onClick={handleSave}>
+                Save
+              </Button>
+              <Button variant="outline" onClick={() => setIsEditing(false)}>
+                Cancel
+              </Button>
             </div>
           ) : (
             <Button onClick={() => setIsEditing(true)}>Edit Profile</Button>
