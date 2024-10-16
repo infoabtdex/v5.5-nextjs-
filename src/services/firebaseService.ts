@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getStorage, ref, uploadString, getDownloadURL, deleteObject, listAll, StorageReference } from 'firebase/storage';
+import { getStorage, ref, uploadString, getDownloadURL, deleteObject, listAll, StorageReference, getMetadata } from 'firebase/storage';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, User } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, enableIndexedDbPersistence } from 'firebase/firestore';
 
@@ -64,11 +64,19 @@ export const deletePhoto = async (fileName: string): Promise<void> => {
   await deleteObject(storageRef);
 };
 
-export const getAllPhotos = async (): Promise<string[]> => {
+export const getAllPhotos = async (): Promise<{ id: string; src: string; date: Date }[]> => {
   const storageRef = ref(storage, 'photos');
   const result = await listAll(storageRef);
-  const urls = await Promise.all(result.items.map((itemRef: StorageReference) => getDownloadURL(itemRef)));
-  return urls;
+  const photos = await Promise.all(result.items.map(async (itemRef: StorageReference) => {
+    const url = await getDownloadURL(itemRef);
+    const metadata = await getMetadata(itemRef);
+    return {
+      id: itemRef.name,
+      src: url,
+      date: new Date(metadata.timeCreated)
+    };
+  }));
+  return photos.sort((a, b) => b.date.getTime() - a.date.getTime());
 };
 
 export const logout = async () => {
