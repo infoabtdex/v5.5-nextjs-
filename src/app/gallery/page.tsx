@@ -136,7 +136,7 @@ export default function GalleryPage() {
           </Link>
         ) : (
           <Button onClick={() => setIsSelectionMode(true)}>
-            Select Media
+            Select Photos
           </Button>
         )}
       </div>
@@ -166,7 +166,7 @@ export default function GalleryPage() {
                 <PhotoCard
                   key={media.id}
                   src={media.src}
-                  alt={`Media ${media.id}`}
+                  alt={`Photo ${media.id}`}
                   type={media.type}
                   isSelectable={isSelectionMode}
                   isSelected={selectedMedia.includes(media.id)}
@@ -187,7 +187,7 @@ export default function GalleryPage() {
             {expandedMedia.type === 'photo' ? (
               <Image
                 src={expandedMedia.src}
-                alt={`Expanded media ${expandedMedia.id}`}
+                alt={`Expanded photo ${expandedMedia.id}`}
                 layout="fill"
                 objectFit="contain"
               />

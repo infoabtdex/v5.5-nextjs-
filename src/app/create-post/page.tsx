@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { RefreshCw, Share2, ChevronLeft, X } from 'lucide-react'
+import { RefreshCw, Share2, ChevronLeft, X, Instagram, Twitter, Facebook } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -98,17 +98,47 @@ export default function CreatePostPage() {
     })
   }, [])
 
+  const handleShare = useCallback(async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'My Post',
+          text: caption,
+          url: 'https://yourappdomain.com/post', // Replace with your actual post URL
+        })
+        console.log('Shared successfully')
+      } catch (error) {
+        console.log('Error sharing:', error)
+      }
+    } else {
+      console.log('Web Share API not supported')
+      // Fallback to your custom share menu
+    }
+  }, [caption])
+
+  const handleSocialShare = useCallback((platform: string) => {
+    // Implement platform-specific sharing logic here
+    console.log(`Sharing to ${platform}`)
+    // You would typically open a new window with the platform's share URL
+  }, [])
+
+  const openUserManual = useCallback(() => {
+    // Implement logic to open the user manual
+    console.log('Opening user manual')
+    // This could open a new page or modal with instructions
+  }, [])
+
   const renderEnhanceStep = useMemo(() => (
     <div>
       <h2 className="text-xl font-bold mb-4">Choose Enhanced Versions</h2>
       {selectedMedia.map((media, mediaIndex) => (
         <div key={media.id} className="mb-6">
-          <h3 className="text-lg font-semibold mb-2">Media {mediaIndex + 1}</h3>
+          <h3 className="text-lg font-semibold mb-2">Photo {mediaIndex + 1}</h3>
           <div className="mb-2">
             {media.type === 'photo' ? (
               <Image
                 src={media.src}
-                alt={`Original media ${mediaIndex + 1}`}
+                alt={`Original photo ${mediaIndex + 1}`}
                 width={200}
                 height={200}
                 className="rounded-lg object-cover"
@@ -132,8 +162,8 @@ export default function CreatePostPage() {
                   isSelected={selectedVersions[mediaIndex] === version}
                   onSelect={() => handleVersionSelect(mediaIndex, version)}
                   onRegenerate={() => handleRegenerateVersion(mediaIndex, versionIndex)}
-                  label={versionIndex === 0 ? 'Your common edits' : 
-                         versionIndex === 1 ? 'Most popular edits' : 'AI\'s edits'}
+                  label={versionIndex === 0 ? 'Enhanced photo' : 
+                         versionIndex === 1 ? 'Proposed enhancements' : 'Trending enhancements'}
                 />
               ))}
             </div>
@@ -155,7 +185,7 @@ export default function CreatePostPage() {
             {media.type === 'photo' ? (
               <Image
                 src={selectedVersions[index] || media.src}
-                alt={`Selected media ${index + 1}`}
+                alt={`Selected photo ${index + 1}`}
                 layout="fill"
                 objectFit="cover"
                 className="rounded-lg"
@@ -179,23 +209,38 @@ export default function CreatePostPage() {
         onChange={(e) => setCaption(e.target.value)}
         className="w-full h-32 mb-4"
       />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button className="w-full">
-            <Share2 className="mr-2 h-4 w-4" />
-            Share
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-56">
-          <DropdownMenuItem>Instagram</DropdownMenuItem>
-          <DropdownMenuItem>Twitter</DropdownMenuItem>
-          <DropdownMenuItem>Facebook</DropdownMenuItem>
-          <DropdownMenuItem>TikTok</DropdownMenuItem>
-          <DropdownMenuItem>Save to Device</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className="flex space-x-2">
+        <Button className="flex-grow" onClick={handleShare}>
+          <Share2 className="mr-2 h-4 w-4" />
+          Share
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              More Options
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56">
+            <DropdownMenuItem onClick={() => handleSocialShare('Instagram')}>
+              <Instagram className="mr-2 h-4 w-4" />
+              Share to Instagram
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleSocialShare('Twitter')}>
+              <Twitter className="mr-2 h-4 w-4" />
+              Share to Twitter
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleSocialShare('Facebook')}>
+              <Facebook className="mr-2 h-4 w-4" />
+              Share to Facebook
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={openUserManual}>
+              Open User Manual
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
-  ), [selectedMedia, selectedVersions, caption])
+  ), [selectedMedia, selectedVersions, caption, handleShare, handleSocialShare, openUserManual])
 
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 p-4">
