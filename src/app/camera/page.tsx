@@ -56,10 +56,11 @@ export default function CameraPage() {
         video: {
           facingMode: isFrontCamera ? 'user' : 'environment',
         },
-        audio: true
+        audio: false // Change this to false to prevent audio from being captured during preview
       })
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        videoRef.current.muted = true // Ensure the video element is muted
       }
       mediaStreamRef.current = stream
 
@@ -111,6 +112,50 @@ export default function CameraPage() {
   }
 
   const startRecording = () => {
+    if (mediaStreamRef.current) {
+      // Create a new stream that includes both video and audio
+      navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+        .then(audioStream => {
+          const videoTrack = mediaStreamRef.current!.getVideoTracks()[0];
+          const audioTrack = audioStream.getAudioTracks()[0];
+          const combinedStream = new MediaStream([videoTrack, audioTrack]);
+
+          mediaRecorderRef.current = new MediaRecorder(combinedStream);
+          chunksRef.current = [];
+
+          mediaRecorderRef.current.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              chunksRef.current.push(event.data);
+            }
+          };
+
+          mediaRecorderRef.current.onstop = async () => {
+            audioTrack.stop(); // Stop the audio track when recording stops
+            const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+            setIsUploading(true);
+            try {
+              const fileName = `video_${Date.now()}.webm`;
+              const downloadUrl = await uploadVideo(blob, fileName);
+              console.log('Video uploaded successfully. Download URL:', downloadUrl);
+            } catch (error) {
+              console.error('Error uploading video:', error);
+            } finally {
+              setIsUploading(false);
+            }
+          };
+
+          mediaRecorderRef.current.start();
+          setIsRecording(true);
+        })
+        .catch(error => {
+          console.error('Error accessing audio for recording:', error);
+          // Fallback to video-only recording if audio access fails
+          startVideoOnlyRecording();
+        });
+    }
+  };
+
+  const startVideoOnlyRecording = () => {
     if (mediaStreamRef.current) {
       mediaRecorderRef.current = new MediaRecorder(mediaStreamRef.current)
       chunksRef.current = []
@@ -203,7 +248,7 @@ export default function CameraPage() {
         animate={{ scale: 1 }}
         transition={{ duration: 0.5 }}
       >
-        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
       </motion.div>
 
       {/* Top Controls */}
