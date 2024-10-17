@@ -58,6 +58,48 @@ const EnhancedVersionButton = React.memo(({
 
 EnhancedVersionButton.displayName = 'EnhancedVersionButton'
 
+const EnhancedVideoButton = React.memo(({ 
+  version, 
+  isSelected, 
+  onSelect, 
+  onRegenerate, 
+  label 
+}: { 
+  version: string
+  isSelected: boolean
+  onSelect: () => void
+  onRegenerate: () => void
+  label: string
+}) => (
+  <div className="relative">
+    <button
+      className={`relative w-full aspect-video overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+        isSelected ? 'ring-2 ring-blue-500' : ''
+      }`}
+      onClick={onSelect}
+    >
+      <video
+        src={version}
+        className="w-full h-full object-cover"
+        muted
+        playsInline
+        preload="metadata"
+      />
+    </button>
+    <Button
+      size="icon"
+      variant="ghost"
+      className="absolute top-1 right-1 bg-black bg-opacity-50"
+      onClick={onRegenerate}
+    >
+      <RefreshCw className="h-4 w-4" />
+    </Button>
+    <p className="text-xs text-center mt-1">{label}</p>
+  </div>
+))
+
+EnhancedVideoButton.displayName = 'EnhancedVideoButton'
+
 export default function CreatePostPage() {
   const searchParams = useSearchParams()
   const [selectedMedia, setSelectedMedia] = useState<Media[]>([])
@@ -68,7 +110,7 @@ export default function CreatePostPage() {
 
   useEffect(() => {
     const fetchMedia = async () => {
-      const mediaIds = searchParams.get('media')?.split(',') || []
+      const mediaIds = searchParams?.get('media')?.split(',') || []
       const media = await Promise.all(
         mediaIds.map(async (id): Promise<Media> => ({
           id,
@@ -78,7 +120,7 @@ export default function CreatePostPage() {
       )
       setSelectedMedia(media)
       const enhanced = media.map(item => 
-        item.type === 'photo' ? [item.src, item.src, item.src] : [item.src]
+        [item.src, item.src, item.src] // Generate 3 versions for both photos and videos
       )
       setEnhancedVersions(enhanced)
       setSelectedVersions(enhanced.map(versions => versions[0]))
@@ -133,7 +175,7 @@ export default function CreatePostPage() {
       <h2 className="text-xl font-bold mb-4">Choose Enhanced Versions</h2>
       {selectedMedia.map((media, mediaIndex) => (
         <div key={media.id} className="mb-6">
-          <h3 className="text-lg font-semibold mb-2">Photo {mediaIndex + 1}</h3>
+          <h3 className="text-lg font-semibold mb-2">{media.type === 'photo' ? 'Photo' : 'Video'} {mediaIndex + 1}</h3>
           <div className="mb-2">
             {media.type === 'photo' ? (
               <Image
@@ -153,21 +195,31 @@ export default function CreatePostPage() {
               />
             )}
           </div>
-          {media.type === 'photo' && (
-            <div className="grid grid-cols-3 gap-2">
-              {enhancedVersions[mediaIndex].map((version, versionIndex) => (
+          <div className="grid grid-cols-3 gap-2">
+            {enhancedVersions[mediaIndex].map((version, versionIndex) => (
+              media.type === 'photo' ? (
                 <EnhancedVersionButton
                   key={versionIndex}
                   version={version}
                   isSelected={selectedVersions[mediaIndex] === version}
                   onSelect={() => handleVersionSelect(mediaIndex, version)}
                   onRegenerate={() => handleRegenerateVersion(mediaIndex, versionIndex)}
-                  label={versionIndex === 0 ? 'Enhanced photo' : 
-                         versionIndex === 1 ? 'Proposed enhancements' : 'Trending enhancements'}
+                  label={versionIndex === 0 ? 'Enhanced' : 
+                         versionIndex === 1 ? 'Proposed' : 'Trending'}
                 />
-              ))}
-            </div>
-          )}
+              ) : (
+                <EnhancedVideoButton
+                  key={versionIndex}
+                  version={version}
+                  isSelected={selectedVersions[mediaIndex] === version}
+                  onSelect={() => handleVersionSelect(mediaIndex, version)}
+                  onRegenerate={() => handleRegenerateVersion(mediaIndex, versionIndex)}
+                  label={versionIndex === 0 ? 'Enhanced' : 
+                         versionIndex === 1 ? 'Proposed' : 'Trending'}
+                />
+              )
+            ))}
+          </div>
         </div>
       ))}
       <Button className="w-full mt-4" onClick={() => setStep('caption')}>
