@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import ClientLayout from './ClientLayout'
+import { PermissionProvider } from './camera/page'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -18,9 +19,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        <ClientLayout>{children}</ClientLayout>
-      </body>
+      <PermissionProvider>
+        <body className={inter.className}>
+          <ClientLayout>{children}</ClientLayout>
+        </body>
+      </PermissionProvider>
     </html>
   )
 }

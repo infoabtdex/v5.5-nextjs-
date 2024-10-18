@@ -11,12 +11,33 @@ import { logout } from '../../services/firebaseService'
 
 type CaptureMode = 'photo' | 'video'
 
+// Create a new context to store permission status
+import { createContext, useContext } from 'react'
+
+const PermissionContext = createContext<{
+  hasPermission: boolean | null;
+  setHasPermission: React.Dispatch<React.SetStateAction<boolean | null>>;
+}>({
+  hasPermission: null,
+  setHasPermission: () => {},
+})
+
+export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null)
+  return (
+    <PermissionContext.Provider value={{ hasPermission, setHasPermission }}>
+      {children}
+    </PermissionContext.Provider>
+  )
+}
+
+export const usePermission = () => useContext(PermissionContext)
+
 export default function CameraPage() {
   const [cameraMode, setCameraMode] = useState<CaptureMode>('photo')
   const [isFlashOn, setIsFlashOn] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [isFrontCamera, setIsFrontCamera] = useState(false)
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -25,16 +46,15 @@ export default function CameraPage() {
   const chunksRef = useRef<Blob[]>([])
   const router = useRouter()
   const [captureAnimation, setCaptureAnimation] = useState(false)
+  const { hasPermission, setHasPermission } = usePermission()
 
   useEffect(() => {
-    requestCameraPermission()
-  }, [])
-
-  useEffect(() => {
-    if (hasPermission) {
+    if (hasPermission === null) {
+      requestCameraPermission()
+    } else if (hasPermission) {
       startCamera()
     }
-  }, [hasPermission, isFrontCamera])
+  }, [hasPermission])
 
   const requestCameraPermission = async () => {
     try {
@@ -57,18 +77,16 @@ export default function CameraPage() {
         video: {
           facingMode: isFrontCamera ? 'user' : 'environment',
         },
-        audio: false // Change this to false to prevent audio from being captured during preview
+        audio: false
       })
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        videoRef.current.muted = true // Ensure the video element is muted
+        videoRef.current.muted = true
       }
       mediaStreamRef.current = stream
 
-      // Apply flash if it's on
       if (isFlashOn) {
         const track = stream.getVideoTracks()[0]
-        // Check if the torch feature is supported
         if ('torch' in track.getCapabilities()) {
           await (track as any).applyConstraints({ advanced: [{ torch: true }] })
         }
@@ -232,6 +250,7 @@ export default function CameraPage() {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-black text-white">
         <p>Camera permission is required to use this feature.</p>
+        <Button onClick={requestCameraPermission}>Grant Permission</Button>
       </div>
     )
   }
