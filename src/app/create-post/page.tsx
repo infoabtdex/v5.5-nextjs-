@@ -226,8 +226,8 @@ export default function CreatePostPage() {
                   isSelected={selectedVersions[mediaIndex] === versionIndex}
                   onSelect={() => handleVersionSelect(mediaIndex, versionIndex)}
                   onRegenerate={() => handleRegenerateVersion(mediaIndex, versionIndex)}
-                  label={versionIndex === 0 ? 'Enhanced' : 
-                         versionIndex === 1 ? 'Proposed' : 'Trending'}
+                  label={versionIndex === 0 ? 'User enhanced' : 
+                         versionIndex === 1 ? 'AI proposed' : 'Trending'}
                 />
               ) : (
                 <EnhancedVideoButton
@@ -236,8 +236,8 @@ export default function CreatePostPage() {
                   isSelected={selectedVersions[mediaIndex] === versionIndex}
                   onSelect={() => handleVersionSelect(mediaIndex, versionIndex)}
                   onRegenerate={() => handleRegenerateVersion(mediaIndex, versionIndex)}
-                  label={versionIndex === 0 ? 'Enhanced' : 
-                         versionIndex === 1 ? 'Proposed' : 'Trending'}
+                  label={versionIndex === 0 ? 'User enhanced' : 
+                         versionIndex === 1 ? 'AI proposed' : 'Trending'}
                 />
               )
             ))}
