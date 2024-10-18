@@ -24,6 +24,7 @@ export default function CameraPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const router = useRouter()
+  const [captureAnimation, setCaptureAnimation] = useState(false)
 
   useEffect(() => {
     requestCameraPermission()
@@ -91,6 +92,7 @@ export default function CameraPage() {
 
   const captureAndUploadPhoto = async () => {
     if (videoRef.current) {
+      setCaptureAnimation(true)
       const canvas = document.createElement('canvas')
       canvas.width = videoRef.current.videoWidth
       canvas.height = videoRef.current.videoHeight
@@ -102,11 +104,11 @@ export default function CameraPage() {
         const fileName = `photo_${Date.now()}.jpg`
         const downloadUrl = await uploadPhoto(photoDataUrl, fileName)
         console.log('Photo uploaded successfully. Download URL:', downloadUrl)
-        // Removed the router.push('/gallery') line
       } catch (error) {
         console.error('Error uploading photo:', error)
       } finally {
         setIsUploading(false)
+        setTimeout(() => setCaptureAnimation(false), 100) // Reset animation after 100ms
       }
     }
   }
@@ -250,6 +252,19 @@ export default function CameraPage() {
       >
         <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
       </motion.div>
+
+      {/* Capture Animation Ring */}
+      <AnimatePresence>
+        {captureAnimation && (
+          <motion.div
+            className="absolute inset-0 border-4 border-white pointer-events-none"
+            initial={{ opacity: 0, scale: 1.1 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.1 }}
+            transition={{ duration: 0.1 }} // 100ms duration
+          />
+        )}
+      </AnimatePresence>
 
       {/* Top Controls */}
       <motion.div 
