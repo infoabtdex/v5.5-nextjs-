@@ -1,12 +1,13 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { ChevronRight, ChevronDown, ArrowLeft, X } from 'lucide-react'
+import { ChevronRight, ChevronDown, ArrowLeft, X, Trash, Edit, Share2, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from "@/components/ui/button"
 import PhotoCard from '@/components/PhotoCard'
 import { getAllMedia, deletePhoto, deleteVideo } from '@/services/firebaseService'
 import Image from 'next/image'
+import { useSwipeable } from 'react-swipeable'
 
 interface Media {
   id: string
@@ -45,6 +46,8 @@ export default function GalleryPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [expandedSessions, setExpandedSessions] = useState<string[]>([])
   const [expandedMedia, setExpandedMedia] = useState<Media | null>(null)
+  const [currentIndex, setCurrentIndex] = useState<number>(0)
+  const [direction, setDirection] = useState<'left' | 'right' | null>(null)
 
   useEffect(() => {
     const fetchMedia = async () => {
@@ -85,6 +88,8 @@ export default function GalleryPage() {
           media: session.media.filter(item => item.id !== media.id)
         })).filter(session => session.media.length > 0)
       )
+      // Close the expanded view after deletion
+      setExpandedMedia(null)
     } catch (error) {
       console.error('Error deleting media:', error)
     }
@@ -110,9 +115,40 @@ export default function GalleryPage() {
 
   const handleMediaClick = useCallback((media: Media) => {
     if (!isSelectionMode) {
+      const allMedia = sessions.flatMap(s => s.media)
+      const index = allMedia.findIndex(m => m.id === media.id)
+      setCurrentIndex(index)
       setExpandedMedia(media)
     }
-  }, [isSelectionMode])
+  }, [isSelectionMode, sessions])
+
+  const handlePrevMedia = useCallback(() => {
+    if (!expandedMedia) return
+    const allMedia = sessions.flatMap(s => s.media)
+    setDirection('right')
+    setCurrentIndex((prevIndex) => {
+      const newIndex = (prevIndex - 1 + allMedia.length) % allMedia.length
+      setExpandedMedia(allMedia[newIndex])
+      return newIndex
+    })
+  }, [expandedMedia, sessions])
+
+  const handleNextMedia = useCallback(() => {
+    if (!expandedMedia) return
+    const allMedia = sessions.flatMap(s => s.media)
+    setDirection('left')
+    setCurrentIndex((prevIndex) => {
+      const newIndex = (prevIndex + 1) % allMedia.length
+      setExpandedMedia(allMedia[newIndex])
+      return newIndex
+    })
+  }, [expandedMedia, sessions])
+
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: handleNextMedia,
+    onSwipedRight: handlePrevMedia,
+    trackMouse: true
+  })
 
   if (isLoading) {
     return <div className="min-h-screen bg-gray-100 flex items-center justify-center">Loading...</div>
@@ -142,7 +178,7 @@ export default function GalleryPage() {
       </div>
       {sessions.map((session) => (
         <div key={session.id} className="mb-8">
-          <div className="flex justify-between items-center mb-2">
+          <div className="flex items-center mb-2">
             <button 
               onClick={() => toggleSession(session.id)}
               className="text-lg font-semibold flex items-center focus:outline-none"
@@ -154,10 +190,6 @@ export default function GalleryPage() {
                 <ChevronRight className="h-5 w-5 mr-1" />
               )}
               {session.date}
-            </button>
-            <button className="text-blue-500 flex items-center text-sm">
-              See all
-              <ChevronRight className="h-4 w-4 ml-1" />
             </button>
           </div>
           {expandedSessions.includes(session.id) && (
@@ -182,29 +214,72 @@ export default function GalleryPage() {
         </div>
       ))}
       {expandedMedia && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 overflow-hidden" {...swipeHandlers}>
           <div className="relative w-full h-full max-w-4xl max-h-4xl">
-            {expandedMedia.type === 'photo' ? (
-              <Image
-                src={expandedMedia.src}
-                alt={`Expanded photo ${expandedMedia.id}`}
-                layout="fill"
-                objectFit="contain"
-              />
-            ) : (
-              <video
-                src={expandedMedia.src}
-                className="w-full h-full object-contain"
-                controls
-                autoPlay
-              />
-            )}
+            <div 
+              className={`absolute inset-0 transition-transform duration-300 ease-out ${
+                direction === 'left' ? '-translate-x-full' : 
+                direction === 'right' ? 'translate-x-full' : ''
+              }`}
+              onTransitionEnd={() => setDirection(null)}
+            >
+              {expandedMedia.type === 'photo' ? (
+                <Image
+                  src={expandedMedia.src}
+                  alt={`Expanded photo ${expandedMedia.id}`}
+                  layout="fill"
+                  objectFit="contain"
+                />
+              ) : (
+                <video
+                  src={expandedMedia.src}
+                  className="w-full h-full object-contain"
+                  controls
+                  playsInline
+                />
+              )}
+            </div>
             <button
-              className="absolute top-4 right-4 text-white"
+              className="absolute top-4 right-4 text-white bg-black bg-opacity-50 p-2 rounded-full"
               onClick={() => setExpandedMedia(null)}
             >
               <X className="h-6 w-6" />
             </button>
+            <button
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white bg-black bg-opacity-50 p-2 rounded-full"
+              onClick={handlePrevMedia}
+            >
+              <ChevronLeftIcon className="h-6 w-6" />
+            </button>
+            <button
+              className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white bg-black bg-opacity-50 p-2 rounded-full"
+              onClick={handleNextMedia}
+            >
+              <ChevronRightIcon className="h-6 w-6" />
+            </button>
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-4">
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={() => handleDelete(expandedMedia)}
+              >
+                <Trash className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={() => handleEdit(expandedMedia.id)}
+              >
+                <Edit className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={() => handleShare(expandedMedia.id)}
+              >
+                <Share2 className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
         </div>
       )}

@@ -37,22 +37,23 @@ const EnhancedVersionButton = React.memo(({
 }) => (
   <div className="relative">
     <button
-      className={`relative w-full aspect-square overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-        isSelected ? 'ring-2 ring-blue-500' : ''
+      className={`relative w-full aspect-square overflow-hidden rounded-lg focus:outline-none transition-all duration-200 ${
+        isSelected ? 'shadow-md border-2 border-blue-500' : ''
       }`}
       onClick={onSelect}
     >
       <Image src={version} alt={`Enhanced version`} layout="fill" objectFit="cover" loading="lazy" />
     </button>
-    <Button
-      size="icon"
-      variant="ghost"
-      className="absolute top-1 right-1 bg-black bg-opacity-50"
-      onClick={onRegenerate}
+    <button
+      className="absolute top-1 right-1 bg-black bg-opacity-40 hover:bg-opacity-60 text-white p-1 rounded-full transition-all duration-200"
+      onClick={(e) => {
+        e.stopPropagation();
+        onRegenerate();
+      }}
     >
-      <RefreshCw className="h-4 w-4" />
-    </Button>
-    <p className="text-xs text-center mt-1">{label}</p>
+      <RefreshCw className="h-3 w-3" />
+    </button>
+    <p className="text-xs text-center mt-1 font-medium text-gray-600">{label}</p>
   </div>
 ))
 
@@ -73,8 +74,8 @@ const EnhancedVideoButton = React.memo(({
 }) => (
   <div className="relative">
     <button
-      className={`relative w-full aspect-video overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-        isSelected ? 'ring-2 ring-blue-500' : ''
+      className={`relative w-full aspect-video overflow-hidden rounded-lg focus:outline-none transition-all duration-200 ${
+        isSelected ? 'shadow-md border-2 border-blue-500' : ''
       }`}
       onClick={onSelect}
     >
@@ -86,15 +87,16 @@ const EnhancedVideoButton = React.memo(({
         preload="metadata"
       />
     </button>
-    <Button
-      size="icon"
-      variant="ghost"
-      className="absolute top-1 right-1 bg-black bg-opacity-50"
-      onClick={onRegenerate}
+    <button
+      className="absolute top-1 right-1 bg-black bg-opacity-40 hover:bg-opacity-60 text-white p-1 rounded-full transition-all duration-200"
+      onClick={(e) => {
+        e.stopPropagation();
+        onRegenerate();
+      }}
     >
-      <RefreshCw className="h-4 w-4" />
-    </Button>
-    <p className="text-xs text-center mt-1">{label}</p>
+      <RefreshCw className="h-3 w-3" />
+    </button>
+    <p className="text-xs text-center mt-1 font-medium text-gray-600">{label}</p>
   </div>
 ))
 
@@ -171,31 +173,33 @@ export default function CreatePostPage() {
   }, [])
 
   const renderEnhanceStep = useMemo(() => (
-    <div>
-      <h2 className="text-xl font-bold mb-4">Choose Enhanced Versions</h2>
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold mb-4 text-gray-800">Choose Enhanced Versions</h2>
       {selectedMedia.map((media, mediaIndex) => (
-        <div key={media.id} className="mb-6">
-          <h3 className="text-lg font-semibold mb-2">{media.type === 'photo' ? 'Photo' : 'Video'} {mediaIndex + 1}</h3>
-          <div className="mb-2">
+        <div key={media.id} className="bg-white rounded-lg shadow-sm p-4">
+          <h3 className="text-lg font-semibold mb-3 text-gray-700">{media.type === 'photo' ? 'Photo' : 'Video'} {mediaIndex + 1}</h3>
+          <div className="mb-4">
             {media.type === 'photo' ? (
-              <Image
-                src={media.src}
-                alt={`Original photo ${mediaIndex + 1}`}
-                width={200}
-                height={200}
-                className="rounded-lg object-cover"
-                loading="lazy"
-              />
+              <div className="relative w-full aspect-square rounded-lg overflow-hidden">
+                <Image
+                  src={media.src}
+                  alt={`Original photo ${mediaIndex + 1}`}
+                  layout="fill"
+                  objectFit="cover"
+                  className="rounded-lg"
+                  loading="lazy"
+                />
+              </div>
             ) : (
               <video
                 src={media.src}
-                className="w-full max-w-[200px] rounded-lg"
+                className="w-full rounded-lg"
                 controls
                 preload="metadata"
               />
             )}
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-3">
             {enhancedVersions[mediaIndex].map((version, versionIndex) => (
               media.type === 'photo' ? (
                 <EnhancedVersionButton
@@ -222,7 +226,7 @@ export default function CreatePostPage() {
           </div>
         </div>
       ))}
-      <Button className="w-full mt-4" onClick={() => setStep('caption')}>
+      <Button className="w-full mt-6 bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-200" onClick={() => setStep('caption')}>
         Next
       </Button>
     </div>
