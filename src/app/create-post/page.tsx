@@ -38,11 +38,20 @@ const EnhancedVersionButton = React.memo(({
   <div className="relative">
     <button
       className={`relative w-full aspect-square overflow-hidden rounded-lg focus:outline-none transition-all duration-200 ${
-        isSelected ? 'shadow-md border-2 border-blue-500' : ''
+        isSelected ? 'transform scale-105 shadow-lg ring-4 ring-blue-500' : ''
       }`}
       onClick={onSelect}
     >
       <Image src={version} alt={`Enhanced version`} layout="fill" objectFit="cover" loading="lazy" />
+      {isSelected && (
+        <div className="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center">
+          <div className="bg-white rounded-full p-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+        </div>
+      )}
     </button>
     <button
       className="absolute top-1 right-1 bg-black bg-opacity-40 hover:bg-opacity-60 text-white p-1 rounded-full transition-all duration-200"
@@ -75,7 +84,7 @@ const EnhancedVideoButton = React.memo(({
   <div className="relative">
     <button
       className={`relative w-full aspect-video overflow-hidden rounded-lg focus:outline-none transition-all duration-200 ${
-        isSelected ? 'shadow-md border-2 border-blue-500' : ''
+        isSelected ? 'transform scale-105 shadow-lg ring-4 ring-blue-500' : ''
       }`}
       onClick={onSelect}
     >
@@ -86,6 +95,15 @@ const EnhancedVideoButton = React.memo(({
         playsInline
         preload="metadata"
       />
+      {isSelected && (
+        <div className="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center">
+          <div className="bg-white rounded-full p-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+        </div>
+      )}
     </button>
     <button
       className="absolute top-1 right-1 bg-black bg-opacity-40 hover:bg-opacity-60 text-white p-1 rounded-full transition-all duration-200"
@@ -107,7 +125,7 @@ export default function CreatePostPage() {
   const [selectedMedia, setSelectedMedia] = useState<Media[]>([])
   const [step, setStep] = useState<'enhance' | 'caption'>('enhance')
   const [enhancedVersions, setEnhancedVersions] = useState<string[][]>([])
-  const [selectedVersions, setSelectedVersions] = useState<string[]>([])
+  const [selectedVersions, setSelectedVersions] = useState<number[]>([])
   const [caption, setCaption] = useState('')
 
   useEffect(() => {
@@ -125,7 +143,7 @@ export default function CreatePostPage() {
         [item.src, item.src, item.src] // Generate 3 versions for both photos and videos
       )
       setEnhancedVersions(enhanced)
-      setSelectedVersions(enhanced.map(versions => versions[0]))
+      setSelectedVersions(new Array(media.length).fill(0)) // Select the first version by default
     }
     fetchMedia()
   }, [searchParams])
@@ -134,10 +152,10 @@ export default function CreatePostPage() {
     console.log(`Regenerating version ${versionIndex} for image ${imageIndex}`)
   }, [])
 
-  const handleVersionSelect = useCallback((imageIndex: number, version: string) => {
+  const handleVersionSelect = useCallback((imageIndex: number, versionIndex: number) => {
     setSelectedVersions(prev => {
       const newVersions = [...prev]
-      newVersions[imageIndex] = version
+      newVersions[imageIndex] = versionIndex
       return newVersions
     })
   }, [])
@@ -205,8 +223,8 @@ export default function CreatePostPage() {
                 <EnhancedVersionButton
                   key={versionIndex}
                   version={version}
-                  isSelected={selectedVersions[mediaIndex] === version}
-                  onSelect={() => handleVersionSelect(mediaIndex, version)}
+                  isSelected={selectedVersions[mediaIndex] === versionIndex}
+                  onSelect={() => handleVersionSelect(mediaIndex, versionIndex)}
                   onRegenerate={() => handleRegenerateVersion(mediaIndex, versionIndex)}
                   label={versionIndex === 0 ? 'Enhanced' : 
                          versionIndex === 1 ? 'Proposed' : 'Trending'}
@@ -215,8 +233,8 @@ export default function CreatePostPage() {
                 <EnhancedVideoButton
                   key={versionIndex}
                   version={version}
-                  isSelected={selectedVersions[mediaIndex] === version}
-                  onSelect={() => handleVersionSelect(mediaIndex, version)}
+                  isSelected={selectedVersions[mediaIndex] === versionIndex}
+                  onSelect={() => handleVersionSelect(mediaIndex, versionIndex)}
                   onRegenerate={() => handleRegenerateVersion(mediaIndex, versionIndex)}
                   label={versionIndex === 0 ? 'Enhanced' : 
                          versionIndex === 1 ? 'Proposed' : 'Trending'}
@@ -240,7 +258,7 @@ export default function CreatePostPage() {
           <div key={media.id} className="relative aspect-square">
             {media.type === 'photo' ? (
               <Image
-                src={selectedVersions[index] || media.src}
+                src={enhancedVersions[index][selectedVersions[index]]}
                 alt={`Selected photo ${index + 1}`}
                 layout="fill"
                 objectFit="cover"
@@ -249,7 +267,7 @@ export default function CreatePostPage() {
               />
             ) : (
               <video
-                src={media.src}
+                src={enhancedVersions[index][selectedVersions[index]]}
                 className="w-full h-full rounded-lg object-cover"
                 muted
                 playsInline
@@ -296,7 +314,7 @@ export default function CreatePostPage() {
         </DropdownMenu>
       </div>
     </div>
-  ), [selectedMedia, selectedVersions, caption, handleShare, handleSocialShare, openUserManual])
+  ), [selectedMedia, enhancedVersions, selectedVersions, caption, handleShare, handleSocialShare, openUserManual])
 
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 p-4">
