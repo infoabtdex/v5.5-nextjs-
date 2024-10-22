@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getStorage, ref, uploadString, uploadBytes, getDownloadURL, deleteObject, listAll, StorageReference, getMetadata } from 'firebase/storage';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, User, updateProfile } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, enableIndexedDbPersistence } from 'firebase/firestore';
 
 // Your web app's Firebase configuration
@@ -28,12 +28,14 @@ enableIndexedDbPersistence(db).catch((err) => {
     }
 });
 
-export const signUp = async (email: string, password: string, username: string): Promise<void> => {
-  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-  await setDoc(doc(db, 'users', userCredential.user.uid), {
-    username,
-    email
-  });
+export const signUp = async (email: string, password: string, username: string): Promise<User> => {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(userCredential.user, { displayName: username });
+    return userCredential.user;  // Return the User object instead of UserCredential
+  } catch (error) {
+    throw error;
+  }
 };
 
 export const signIn = async (email: string, password: string): Promise<void> => {

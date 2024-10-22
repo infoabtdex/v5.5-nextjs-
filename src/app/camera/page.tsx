@@ -47,65 +47,84 @@ export default function CameraPage() {
   const router = useRouter()
   const [captureAnimation, setCaptureAnimation] = useState(false)
   const { hasPermission, setHasPermission } = usePermission()
+  const [permissionStatus, setPermissionStatus] = useState<PermissionState>('prompt')
+  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([])
+  const [currentCameraIndex, setCurrentCameraIndex] = useState<number>(0)
 
   useEffect(() => {
-    if (hasPermission === null) {
-      requestCameraPermission()
-    } else if (hasPermission) {
-      startCamera()
+    checkPermissions()
+  }, [])
+
+  const checkPermissions = async () => {
+    try {
+      const result = await navigator.permissions.query({ name: 'camera' as PermissionName })
+      setPermissionStatus(result.state)
+      result.onchange = () => setPermissionStatus(result.state)
+
+      if (result.state === 'granted' && cameraDevices.length > 0) {
+        startCamera(cameraDevices[currentCameraIndex].deviceId) // Pass the deviceId here
+      }
+    } catch (error) {
+      console.error('Error checking permissions:', error)
+      setPermissionStatus('denied')
     }
-  }, [hasPermission])
+  }
 
   const requestCameraPermission = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      setHasPermission(true)
+      setPermissionStatus('granted')
       stream.getTracks().forEach(track => track.stop()) // Stop the stream immediately
+      if (cameraDevices.length > 0) {
+        startCamera(cameraDevices[currentCameraIndex].deviceId) // Pass the deviceId here
+      }
     } catch (error) {
       console.error('Error requesting camera permission:', error)
-      setHasPermission(false)
+      setPermissionStatus('denied')
     }
   }
 
-  const startCamera = async () => {
+  const startCamera = async (deviceId: string) => {
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => track.stop())
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const constraints: MediaStreamConstraints = {
         video: {
-          facingMode: isFrontCamera ? 'user' : 'environment',
+          deviceId: { exact: deviceId }, // Use exact to ensure the correct camera is selected
         },
-        audio: false
-      })
+        audio: cameraMode === 'video'
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         videoRef.current.muted = true
       }
       mediaStreamRef.current = stream
 
-      if (isFlashOn) {
-        const track = stream.getVideoTracks()[0]
-        if ('torch' in track.getCapabilities()) {
-          await (track as any).applyConstraints({ advanced: [{ torch: true }] })
-        }
-      }
+      applyFlashSetting()
     } catch (error) {
       console.error('Error accessing camera:', error)
-      setHasPermission(false)
+      setPermissionStatus('denied')
+    }
+  }
+
+  const applyFlashSetting = () => {
+    if (mediaStreamRef.current) {
+      const track = mediaStreamRef.current.getVideoTracks()[0]
+      if ('torch' in track.getCapabilities()) {
+        track.applyConstraints({
+          advanced: [{ torch: isFlashOn } as MediaTrackConstraintSet]
+        }).catch(error => console.error('Error applying flash setting:', error))
+      }
     }
   }
 
   const toggleFlash = async () => {
     setIsFlashOn(prev => !prev)
-    if (mediaStreamRef.current) {
-      const track = mediaStreamRef.current.getVideoTracks()[0]
-      // Check if the torch feature is supported
-      if ('torch' in track.getCapabilities()) {
-        await (track as any).applyConstraints({ advanced: [{ torch: !isFlashOn }] })
-      }
-    }
+    applyFlashSetting()
   }
 
   const captureAndUploadPhoto = async () => {
@@ -225,9 +244,19 @@ export default function CameraPage() {
     }
   }, [cameraMode, isRecording])
 
-  const switchCamera = () => {
-    setIsFrontCamera(prev => !prev)
-  }
+  const switchCamera = useCallback(() => {
+    setCurrentCameraIndex(prevIndex => {
+      const nextIndex = (prevIndex + 1) % cameraDevices.length
+      startCamera(cameraDevices[nextIndex].deviceId)
+      return nextIndex
+    })
+  }, [cameraDevices])
+
+  useEffect(() => {
+    if (permissionStatus === 'granted' && cameraDevices.length > 0) {
+      startCamera(cameraDevices[currentCameraIndex].deviceId)
+    }
+  }, [currentCameraIndex, permissionStatus, cameraDevices])
 
   const toggleSettings = () => {
     setIsSettingsOpen(!isSettingsOpen)
@@ -244,13 +273,46 @@ export default function CameraPage() {
 
   const switchMode = (mode: CaptureMode) => {
     setCameraMode(mode)
+    // No need to restart the camera when switching modes
   }
 
-  if (hasPermission === false) {
+  useEffect(() => {
+    if (permissionStatus === 'granted') {
+      enumerateDevices()
+    }
+  }, [permissionStatus])
+
+  const enumerateDevices = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const videoDevices = devices.filter(device => device.kind === 'videoinput')
+
+      console.log('Video Devices:', videoDevices) // Log devices for debugging
+
+      if (videoDevices.length > 0) {
+        setCameraDevices(videoDevices)
+        setCurrentCameraIndex(0) // Start with the first camera
+        startCamera(videoDevices[0].deviceId) // Pass the deviceId here
+      } else {
+        console.error('No video devices found')
+      }
+    } catch (error) {
+      console.error('Error enumerating devices:', error)
+    }
+  }
+
+  if (permissionStatus === 'prompt') {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-black text-white">
-        <p>Camera permission is required to use this feature.</p>
-        <Button onClick={requestCameraPermission}>Grant Permission</Button>
+        <Button onClick={requestCameraPermission}>Grant Camera Permission</Button>
+      </div>
+    )
+  }
+
+  if (permissionStatus === 'denied') {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-black text-white">
+        <p>Camera permission is required to use this feature. Please enable it in your browser settings.</p>
       </div>
     )
   }

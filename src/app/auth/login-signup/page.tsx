@@ -1,10 +1,9 @@
 'use client'
 
+import React from 'react';
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { signIn, signUp } from '../../../services/firebaseService'
 
 export default function LoginSignup() {
@@ -13,11 +12,13 @@ export default function LoginSignup() {
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
+    setSuccessMessage('')
 
     if (!email || !password || (!isLogin && !username)) {
       setError('Please fill in all fields')
@@ -27,12 +28,25 @@ export default function LoginSignup() {
     try {
       if (isLogin) {
         await signIn(email, password)
+        router.push('/camera')
       } else {
-        await signUp(email, password, username)
+        const user = await signUp(email, password, username)
+        if (user) {
+          setSuccessMessage('Account created successfully!')
+          // Optionally, you can clear the form fields here
+          setEmail('')
+          setPassword('')
+          setUsername('')
+        } else {
+          setError('Failed to create account. Please try again.')
+        }
       }
-      router.push('/camera') // Redirect to camera page after successful login/signup
     } catch (error: any) {
-      setError(error.message || 'An error occurred')
+      if (error.code === 'auth/email-already-in-use') {
+        setError('Email already in use. Please use a different email.')
+      } else {
+        setError(error.message || 'An error occurred')
+      }
     }
   }
 
@@ -46,18 +60,28 @@ export default function LoginSignup() {
           </h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {successMessage && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+              <span className="block sm:inline">{successMessage}</span>
+            </div>
+          )}
+          
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+              <span className="block sm:inline">{error}</span>
+            </div>
+          )}
+
           <div className="space-y-4 rounded-md shadow-sm">
             <div>
-              <Label htmlFor="email" className="sr-only">
-                Email address
-              </Label>
-              <Input
+              <label htmlFor="email" className="sr-only">Email address</label>
+              <input
                 id="email"
                 name="email"
                 type="email"
                 autoComplete="email"
                 required
-                className="bg-white text-black"
+                className="bg-white text-black w-full px-3 py-2 border rounded-md"
                 placeholder="Email address"
                 value={email}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
@@ -65,16 +89,16 @@ export default function LoginSignup() {
             </div>
             {!isLogin && (
               <div>
-                <Label htmlFor="username" className="sr-only">
+                <label htmlFor="username" className="sr-only">
                   Username
-                </Label>
-                <Input
+                </label>
+                <input
                   id="username"
                   name="username"
                   type="text"
                   autoComplete="username"
                   required
-                  className="bg-white text-black"
+                  className="bg-white text-black w-full px-3 py-2 border rounded-md"
                   placeholder="Username"
                   value={username}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
@@ -82,24 +106,22 @@ export default function LoginSignup() {
               </div>
             )}
             <div>
-              <Label htmlFor="password" className="sr-only">
+              <label htmlFor="password" className="sr-only">
                 Password
-              </Label>
-              <Input
+              </label>
+              <input
                 id="password"
                 name="password"
                 type="password"
                 autoComplete="current-password"
                 required
-                className="bg-white text-black"
+                className="bg-white text-black w-full px-3 py-2 border rounded-md"
                 placeholder="Password"
                 value={password}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
               />
             </div>
           </div>
-
-          {error && <p className="text-red-500 text-sm">{error}</p>}
 
           <div>
             <Button type="submit" className="w-full bg-white text-black hover:bg-gray-200">
