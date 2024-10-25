@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "../../components/ui/button";
 import {
-  Image,
   Zap,
   RefreshCcw,
   Camera,
@@ -11,12 +10,16 @@ import {
   Settings,
   User,
   LogOut,
+  Play,
+  ImageIcon, // Rename Image to ImageIcon to avoid conflict
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { uploadPhoto, uploadVideo } from "../../services/firebaseService";
+import { uploadPhoto, uploadVideo, type Media, getAllMedia } from "../../services/firebaseService";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { logout } from "../../services/firebaseService";
+import { auth } from "../../services/firebaseService";
+import Image from 'next/image'; // Add this import for Next.js Image component
 
 type CaptureMode = "photo" | "video";
 
@@ -63,6 +66,24 @@ export default function CameraPage() {
   const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
   const [currentCameraIndex, setCurrentCameraIndex] = useState<number>(0);
   const [flashAnimation, setFlashAnimation] = useState(false);
+  // Add recentMedia state
+  const [recentMedia, setRecentMedia] = useState<Media | null>(null);
+
+  // Add useEffect to fetch most recent media on mount
+  useEffect(() => {
+    const fetchRecentMedia = async () => {
+      try {
+        const media = await getAllMedia();
+        if (media.length > 0) {
+          setRecentMedia(media[0]);
+        }
+      } catch (error) {
+        console.error("Error fetching recent media:", error);
+      }
+    };
+
+    fetchRecentMedia();
+  }, [isUploading]); // Add isUploading as dependency to refresh after uploads
 
   useEffect(() => {
     checkPermissions();
@@ -151,31 +172,47 @@ export default function CameraPage() {
 
   const captureAndUploadPhoto = async () => {
     if (videoRef.current) {
-      setCaptureAnimation(true);
       setFlashAnimation(true);
+      requestAnimationFrame(() => {
+        setFlashAnimation(false);
+      });
       
-      // Reduced from 25ms to 12ms
-      await new Promise(resolve => setTimeout(resolve, 12));
-      
-      const canvas = document.createElement("canvas");
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      canvas.getContext("2d")?.drawImage(videoRef.current, 0, 0);
-      const photoDataUrl = canvas.toDataURL("image/jpeg");
-
-      setIsUploading(true);
       try {
+        const canvas = document.createElement("canvas");
+        canvas.width = videoRef.current.videoWidth;
+        canvas.height = videoRef.current.videoHeight;
+        const ctx = canvas.getContext("2d");
+        
+        if (!ctx) {
+          throw new Error("Could not get canvas context");
+        }
+        
+        ctx.drawImage(videoRef.current, 0, 0);
+        const photoDataUrl = canvas.toDataURL("image/jpeg", 0.8); // Added quality parameter
+
+        setIsUploading(true);
         const fileName = `photo_${Date.now()}.jpg`;
         const downloadUrl = await uploadPhoto(photoDataUrl, fileName);
+        
         console.log("Photo uploaded successfully. Download URL:", downloadUrl);
+        
+        // Only set recent media if we have a valid URL
+        if (downloadUrl && auth.currentUser?.uid) {
+          setRecentMedia({
+            id: fileName,
+            src: downloadUrl,
+            type: 'photo',
+            date: new Date(),
+            userId: auth.currentUser.uid
+          });
+        }
       } catch (error) {
-        console.error("Error uploading photo:", error);
+        console.error("Error capturing/uploading photo:", error);
+        if (error instanceof Error) {
+          console.error("Error message:", error.message);
+        }
       } finally {
         setIsUploading(false);
-        setTimeout(() => {
-          setCaptureAnimation(false);
-          setFlashAnimation(false);
-        }, 35); // Reduced from 75ms to 35ms
       }
     }
   };
@@ -517,9 +554,34 @@ export default function CameraPage() {
           <Button
             variant="ghost"
             size="icon"
-            className="bg-black bg-opacity-50 hover:bg-opacity-75"
+            className="w-14 h-14 p-0 overflow-hidden rounded-lg bg-black bg-opacity-50 hover:bg-opacity-75" // Increased from w-12 h-12 to w-14 h-14
           >
-            <Image className="h-6 w-6" />
+            {recentMedia ? (
+              recentMedia.type === 'photo' ? (
+                <Image
+                  src={recentMedia.src}
+                  alt="Latest photo"
+                  width={112}  // Increased from 48 to 112 for HD quality
+                  height={112} // Increased from 48 to 112 for HD quality
+                  className="w-full h-full object-cover"
+                  priority
+                  quality={100}  // Added maximum quality
+                />
+              ) : (
+                <div className="w-full h-full relative">
+                  <video
+                    src={recentMedia.src}
+                    className="w-full h-full object-cover"
+                    playsInline  // Added for better mobile support
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Play className="w-5 h-5 text-white opacity-70" /> {/* Increased play icon size */}
+                  </div>
+                </div>
+              )
+            ) : (
+              <ImageIcon className="h-7 w-7" /> // Increased icon size
+            )}
             <span className="sr-only">Go to Gallery</span>
           </Button>
         </Link>
@@ -535,9 +597,9 @@ export default function CameraPage() {
           variant="ghost"
           size="icon"
           onClick={switchCamera}
-          className="bg-black bg-opacity-50 hover:bg-opacity-75"
+          className="w-14 h-14 bg-black bg-opacity-50 hover:bg-opacity-75" // Increased from default size to w-14 h-14
         >
-          <RefreshCcw className="h-6 w-6" />
+          <RefreshCcw className="h-7 w-7" /> {/* Increased icon size */}
           <span className="sr-only">Switch Camera</span>
         </Button>
       </motion.div>
@@ -555,9 +617,8 @@ export default function CameraPage() {
           <motion.div
             className="absolute inset-0 bg-black pointer-events-none z-50"
             initial={{ opacity: 1 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.035 }} // Reduced from 0.075 to 0.035
+            animate={{ opacity: 0 }}
+            transition={{ duration: 0.0001 }} // Ultra-minimal duration
           />
         )}
       </AnimatePresence>

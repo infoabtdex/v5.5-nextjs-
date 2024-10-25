@@ -110,30 +110,46 @@ export const onAuthStateChange = (callback: (user: User | null) => void): () => 
   return onAuthStateChanged(auth, callback);
 };
 
-export const uploadPhoto = async (dataUrl: string, fileName: string) => {
-  const auth = getAuth();
+export const uploadPhoto = async (dataUrl: string, fileName: string): Promise<string> => {
   const userId = auth.currentUser?.uid;
   
   if (!userId) {
     throw new Error("User not authenticated");
   }
 
-  const storageRef = ref(storage, `photos/${userId}/${fileName}`);
-  const response = await fetch(dataUrl);
-  const blob = await response.blob();
-  await uploadBytes(storageRef, blob);
-  const downloadUrl = await getDownloadURL(storageRef);
+  try {
+    // Convert data URL to blob
+    const response = await fetch(dataUrl);
+    if (!response.ok) {
+      throw new Error("Failed to process photo data");
+    }
+    const blob = await response.blob();
+    
+    // Upload to storage
+    const storageRef = ref(storage, `photos/${userId}/${fileName}`);
+    await uploadBytes(storageRef, blob);
+    
+    // Get download URL
+    const downloadUrl = await getDownloadURL(storageRef);
+    
+    // Save to Firestore
+    const mediaRef = collection(db, "media");
+    await addDoc(mediaRef, {
+      userId,
+      id: fileName,
+      src: downloadUrl,
+      type: "photo",
+      date: serverTimestamp(),
+    });
 
-  const mediaRef = collection(db, "media");
-  await addDoc(mediaRef, {
-    userId,
-    id: fileName,
-    src: downloadUrl,
-    type: "photo",
-    date: serverTimestamp(),
-  });
-
-  return downloadUrl;
+    return downloadUrl;
+  } catch (error) {
+    console.error("Error in uploadPhoto:", error);
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+    }
+    throw error; // Re-throw to handle in the component
+  }
 };
 
 export const getPhotoUrl = async (fileName: string): Promise<string> => {
@@ -322,3 +338,5 @@ export const getMediaUrl = async (fileName: string): Promise<string> => {
 
 // Export the Media type at the end
 export type { Media };
+
+export { auth };
