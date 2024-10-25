@@ -1,13 +1,32 @@
-import { initializeApp } from 'firebase/app';
-import { getStorage, ref, uploadString, uploadBytes, getDownloadURL, deleteObject, listAll, StorageReference, getMetadata } from 'firebase/storage';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, User, updateProfile } from 'firebase/auth';
+import { initializeApp, getApp, type FirebaseApp } from 'firebase/app';
+import { 
+  getStorage, 
+  ref, 
+  uploadBytes, 
+  getDownloadURL, 
+  deleteObject, 
+  listAll, 
+  getMetadata,
+  type StorageReference,
+  type FirebaseStorage 
+} from 'firebase/storage';
+import { 
+  getAuth, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut as firebaseSignOut, 
+  onAuthStateChanged, 
+  updateProfile,
+  type User,
+  type Auth 
+} from 'firebase/auth';
 import { 
   getFirestore, 
   doc, 
   setDoc, 
   getDoc, 
   updateDoc, 
-  enableIndexedDbPersistence, 
+  enableIndexedDbPersistence,
   collection, 
   addDoc, 
   query, 
@@ -15,8 +34,9 @@ import {
   deleteDoc, 
   serverTimestamp,
   where,
-  orderBy,
-  QueryConstraint
+  type Firestore,
+  type DocumentData,
+  type QueryDocumentSnapshot
 } from 'firebase/firestore';
 
 // Define Media type at the top of the file
@@ -38,20 +58,35 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const storage = getStorage(app);
-const auth = getAuth(app);
-const db = getFirestore(app);
+// Initialize Firebase only once
+let app: FirebaseApp;
+let storage: FirebaseStorage;
+let auth: Auth;
+let db: Firestore;
+
+try {
+  app = getApp();
+} catch {
+  app = initializeApp(firebaseConfig);
+}
+
+storage = getStorage(app);
+auth = getAuth(app);
+db = getFirestore(app);
 
 // Enable offline persistence
-enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code == 'failed-precondition') {
-        console.log("Multiple tabs open, persistence can only be enabled in one tab at a a time.");
-    } else if (err.code == 'unimplemented') {
-        console.log("The current browser does not support all of the features required to enable persistence");
-    }
+enableIndexedDbPersistence(db, {
+  forceOwnership: true
+}).catch((err: { code: string }) => {
+  if (err.code === 'failed-precondition') {
+    console.log("Multiple tabs open, persistence can only be enabled in one tab at a time.");
+  } else if (err.code === 'unimplemented') {
+    console.log("The current browser doesn't support all of the features required to enable persistence");
+  }
 });
+
+// Remove enableNetwork as it's not needed
+// db.enableNetwork().catch(console.error);
 
 export const signUp = async (email: string, password: string, username: string): Promise<User> => {
   try {
@@ -146,7 +181,7 @@ export const getAllPhotos = async (): Promise<{ id: string; src: string; date: D
       date: new Date(metadata.timeCreated)
     };
   }));
-  return photos.sort((a, b) => b.date.getTime() - a.date.getTime());
+  return photos.sort((a: { date: Date }, b: { date: Date }) => b.date.getTime() - a.date.getTime());
 };
 
 export const logout = async () => {
@@ -252,20 +287,18 @@ export const getAllMedia = async (): Promise<Media[]> => {
 
   try {
     const mediaRef = collection(db, "media");
-    // First try without orderBy to see if we can get the data
     const q = query(
       mediaRef,
       where("userId", "==", userId)
     );
     
     const querySnapshot = await getDocs(q);
-    const media = querySnapshot.docs.map((doc) => ({
+    const media = querySnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
       ...doc.data(),
       id: doc.id,
       date: doc.data().date?.toDate() || new Date(),
     })) as Media[];
 
-    // Sort the results in memory instead of using orderBy
     return media.sort((a, b) => b.date.getTime() - a.date.getTime());
 
   } catch (error: any) {

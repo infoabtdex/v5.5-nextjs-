@@ -30,6 +30,14 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null)
 
+  // Preload image
+  useEffect(() => {
+    if (type === 'photo') {
+      const img = document.createElement('img');
+      img.src = src;
+    }
+  }, [src, type]);
+
   useEffect(() => {
     if (type === 'video' && videoRef.current) {
       videoRef.current.currentTime = 0

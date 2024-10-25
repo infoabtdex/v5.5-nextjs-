@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -14,7 +14,17 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import PhotoCard from "@/components/PhotoCard";
+import { useVirtualizer } from '@tanstack/react-virtual';
+import dynamic from 'next/dynamic';
+
+// Dynamically import PhotoCard with no SSR
+const PhotoCard = dynamic(() => import('@/components/PhotoCard'), {
+  ssr: false,
+  loading: () => (
+    <div className="aspect-square bg-gray-200 animate-pulse rounded-lg" />
+  ),
+});
+
 import {
   getAllMedia,
   deletePhoto,
@@ -59,8 +69,19 @@ const groupMediaByDate = (media: Media[]): Session[] => {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
 
+interface VirtualItem {
+  index: number;
+  start: number;
+  end: number;
+  size: number;
+  lane: number;
+}
+
 export default function GalleryPage() {
   const router = useRouter();
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // State hooks
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedMedia, setSelectedMedia] = useState<string[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -70,6 +91,26 @@ export default function GalleryPage() {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [direction, setDirection] = useState<"left" | "right" | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [visibleSessions, setVisibleSessions] = useState<Session[]>([]);
+
+  // Initialize virtualizer after sessions state is declared
+  const rowVirtualizer = useVirtualizer({
+    count: sessions.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => 300,
+    overscan: 5,
+  });
+
+  // Update visible sessions when scrolling
+  useEffect(() => {
+    if (sessions.length > 0) {
+      const visibleRange = rowVirtualizer.getVirtualItems();
+      const visibleSessionsData = visibleRange.map(
+        (virtualRow: VirtualItem) => sessions[virtualRow.index]
+      );
+      setVisibleSessions(visibleSessionsData);
+    }
+  }, [sessions, rowVirtualizer.getVirtualItems()]);
 
   // All callback hooks
   const handleMediaSelect = useCallback((mediaId: string) => {
@@ -231,43 +272,62 @@ export default function GalleryPage() {
           </Button>
         )}
       </div>
-      {sessions.map((session) => (
-        <div key={session.id} className="mb-8">
-          <div className="flex items-center mb-2">
-            <button
-              onClick={() => toggleSession(session.id)}
-              className="text-lg font-semibold flex items-center focus:outline-none"
-              aria-expanded={expandedSessions.includes(session.id)}
-            >
-              {expandedSessions.includes(session.id) ? (
-                <ChevronDown className="h-5 w-5 mr-1" />
-              ) : (
-                <ChevronRight className="h-5 w-5 mr-1" />
-              )}
-              {session.date}
-            </button>
-          </div>
-          {expandedSessions.includes(session.id) && (
-            <div className="grid grid-cols-4 gap-4">
-              {session.media.map((media) => (
-                <PhotoCard
-                  key={media.id}
-                  src={media.src}
-                  alt={`Photo ${media.id}`}
-                  type={media.type}
-                  isSelectable={isSelectionMode}
-                  isSelected={selectedMedia.includes(media.id)}
-                  onSelect={() => handleMediaSelect(media.id)}
-                  onDelete={() => handleDelete(media)}
-                  onEdit={() => handleEdit(media.id)}
-                  onShare={() => handleShare(media.id)}
-                  onClick={() => handleMediaClick(media)}
-                />
-              ))}
-            </div>
-          )}
+      <div ref={containerRef} className="h-[calc(100vh-100px)] overflow-auto">
+        <div
+          style={{
+            height: `${rowVirtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          {rowVirtualizer.getVirtualItems().map((virtualRow: VirtualItem) => {
+            const session = sessions[virtualRow.index];
+            return (
+              <div
+                key={session.id}
+                className="mb-8 absolute top-0 left-0 w-full"
+                style={{
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <div className="flex items-center mb-2">
+                  <button
+                    onClick={() => toggleSession(session.id)}
+                    className="text-lg font-semibold flex items-center focus:outline-none"
+                    aria-expanded={expandedSessions.includes(session.id)}
+                  >
+                    {expandedSessions.includes(session.id) ? (
+                      <ChevronDown className="h-5 w-5 mr-1" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5 mr-1" />
+                    )}
+                    {session.date}
+                  </button>
+                </div>
+                {expandedSessions.includes(session.id) && (
+                  <div className="grid grid-cols-4 gap-4">
+                    {session.media.map((media) => (
+                      <PhotoCard
+                        key={media.id}
+                        src={media.src}
+                        alt={`Photo ${media.id}`}
+                        type={media.type}
+                        isSelectable={isSelectionMode}
+                        isSelected={selectedMedia.includes(media.id)}
+                        onSelect={() => handleMediaSelect(media.id)}
+                        onDelete={() => handleDelete(media)}
+                        onEdit={() => handleEdit(media.id)}
+                        onShare={() => handleShare(media.id)}
+                        onClick={() => handleMediaClick(media)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-      ))}
+      </div>
       {expandedMedia && (
         <div
           className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 overflow-hidden"
