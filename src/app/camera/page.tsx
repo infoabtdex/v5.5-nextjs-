@@ -172,10 +172,8 @@ export default function CameraPage() {
 
   const captureAndUploadPhoto = async () => {
     if (videoRef.current) {
+      // Trigger flash animation
       setFlashAnimation(true);
-      requestAnimationFrame(() => {
-        setFlashAnimation(false);
-      });
       
       try {
         const canvas = document.createElement("canvas");
@@ -188,15 +186,17 @@ export default function CameraPage() {
         }
         
         ctx.drawImage(videoRef.current, 0, 0);
-        const photoDataUrl = canvas.toDataURL("image/jpeg", 0.8); // Added quality parameter
+        const photoDataUrl = canvas.toDataURL("image/jpeg", 0.8);
+
+        // Reset flash animation after a very brief moment
+        setTimeout(() => {
+          setFlashAnimation(false);
+        }, 50); // Short delay to ensure the black screen is visible
 
         setIsUploading(true);
         const fileName = `photo_${Date.now()}.jpg`;
         const downloadUrl = await uploadPhoto(photoDataUrl, fileName);
         
-        console.log("Photo uploaded successfully. Download URL:", downloadUrl);
-        
-        // Only set recent media if we have a valid URL
         if (downloadUrl && auth.currentUser?.uid) {
           setRecentMedia({
             id: fileName,
@@ -211,6 +211,7 @@ export default function CameraPage() {
         if (error instanceof Error) {
           console.error("Error message:", error.message);
         }
+        setFlashAnimation(false); // Ensure flash animation is reset on error
       } finally {
         setIsUploading(false);
       }
@@ -617,8 +618,9 @@ export default function CameraPage() {
           <motion.div
             className="absolute inset-0 bg-black pointer-events-none z-50"
             initial={{ opacity: 1 }}
-            animate={{ opacity: 0 }}
-            transition={{ duration: 0.0001 }} // Ultra-minimal duration
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.001 }}
           />
         )}
       </AnimatePresence>
