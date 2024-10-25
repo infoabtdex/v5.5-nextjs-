@@ -1,157 +1,192 @@
-'use client'
+"use client";
 
-import React, { useState, useEffect, useCallback } from 'react'
-import { ChevronRight, ChevronDown, ArrowLeft, X, Trash, Edit, Share2, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
-import Link from 'next/link'
-import { Button } from "@/components/ui/button"
-import PhotoCard from '@/components/PhotoCard'
-import { getAllMedia, deletePhoto, deleteVideo } from '@/services/firebaseService'
-import Image from 'next/image'
-import { useSwipeable } from 'react-swipeable'
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  ChevronRight,
+  ChevronDown,
+  ArrowLeft,
+  X,
+  Trash,
+  Edit,
+  Share2,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+} from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import PhotoCard from "@/components/PhotoCard";
+import {
+  getAllMedia,
+  deletePhoto,
+  deleteVideo,
+} from "@/services/firebaseService";
+import Image from "next/image";
+import { useSwipeable } from "react-swipeable";
 
 interface Media {
-  id: string
-  src: string
-  type: 'photo' | 'video'
-  date: Date
+  id: string;
+  src: string;
+  type: "photo" | "video";
+  date: Date;
 }
 
 interface Session {
-  id: string
-  date: string
-  media: Media[]
+  id: string;
+  date: string;
+  media: Media[];
 }
 
 const groupMediaByDate = (media: Media[]): Session[] => {
-  const grouped = media.reduce((acc, media) => {
-    const date = media.date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-    if (!acc[date]) {
-      acc[date] = []
-    }
-    acc[date].push(media)
-    return acc
-  }, {} as Record<string, Media[]>)
+  const grouped = media.reduce(
+    (acc, media) => {
+      const date = media.date.toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      if (!acc[date]) {
+        acc[date] = [];
+      }
+      acc[date].push(media);
+      return acc;
+    },
+    {} as Record<string, Media[]>,
+  );
 
-  return Object.entries(grouped).map(([date, media], index) => ({
-    id: `session-${index}`,
-    date,
-    media: media.sort((a, b) => b.date.getTime() - a.date.getTime())
-  })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-}
+  return Object.entries(grouped)
+    .map(([date, media], index) => ({
+      id: `session-${index}`,
+      date,
+      media: media.sort((a, b) => b.date.getTime() - a.date.getTime()),
+    }))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+};
 
 export default function GalleryPage() {
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [selectedMedia, setSelectedMedia] = useState<string[]>([])
-  const [isSelectionMode, setIsSelectionMode] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [expandedSessions, setExpandedSessions] = useState<string[]>([])
-  const [expandedMedia, setExpandedMedia] = useState<Media | null>(null)
-  const [currentIndex, setCurrentIndex] = useState<number>(0)
-  const [direction, setDirection] = useState<'left' | 'right' | null>(null)
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [selectedMedia, setSelectedMedia] = useState<string[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [expandedSessions, setExpandedSessions] = useState<string[]>([]);
+  const [expandedMedia, setExpandedMedia] = useState<Media | null>(null);
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [direction, setDirection] = useState<"left" | "right" | null>(null);
 
   useEffect(() => {
     const fetchMedia = async () => {
-      setIsLoading(true)
+      setIsLoading(true);
       try {
-        const fetchedMedia = await getAllMedia()
-        const groupedSessions = groupMediaByDate(fetchedMedia)
-        setSessions(groupedSessions)
-        setExpandedSessions([groupedSessions[0]?.id].filter(Boolean))
+        const fetchedMedia = await getAllMedia();
+        const groupedSessions = groupMediaByDate(fetchedMedia);
+        setSessions(groupedSessions);
+        setExpandedSessions([groupedSessions[0]?.id].filter(Boolean));
       } catch (error) {
-        console.error('Error fetching media:', error)
+        console.error("Error fetching media:", error);
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
+    };
 
-    fetchMedia()
-  }, [])
+    fetchMedia();
+  }, []);
 
   const handleMediaSelect = useCallback((mediaId: string) => {
-    setSelectedMedia(prev => 
+    setSelectedMedia((prev) =>
       prev.includes(mediaId)
-        ? prev.filter(id => id !== mediaId)
-        : [...prev, mediaId]
-    )
-  }, [])
+        ? prev.filter((id) => id !== mediaId)
+        : [...prev, mediaId],
+    );
+  }, []);
 
   const handleDelete = useCallback(async (media: Media) => {
     try {
-      if (media.type === 'photo') {
-        await deletePhoto(media.id)
+      if (media.type === "photo") {
+        await deletePhoto(media.id);
       } else {
-        await deleteVideo(media.id)
+        await deleteVideo(media.id);
       }
-      setSessions(prevSessions => 
-        prevSessions.map(session => ({
-          ...session,
-          media: session.media.filter(item => item.id !== media.id)
-        })).filter(session => session.media.length > 0)
-      )
+      setSessions((prevSessions) =>
+        prevSessions
+          .map((session) => ({
+            ...session,
+            media: session.media.filter((item) => item.id !== media.id),
+          }))
+          .filter((session) => session.media.length > 0),
+      );
       // Close the expanded view after deletion
-      setExpandedMedia(null)
+      setExpandedMedia(null);
     } catch (error) {
-      console.error('Error deleting media:', error)
+      console.error("Error deleting media:", error);
     }
-  }, [])
+  }, []);
 
   const handleEdit = useCallback((mediaId: string) => {
     // Implement edit functionality
-    console.log('Edit media:', mediaId)
-  }, [])
+    console.log("Edit media:", mediaId);
+  }, []);
 
   const handleShare = useCallback((mediaId: string) => {
     // Implement share functionality
-    console.log('Share media:', mediaId)
-  }, [])
+    console.log("Share media:", mediaId);
+  }, []); 
 
   const toggleSession = useCallback((sessionId: string) => {
-    setExpandedSessions(prev => 
+    setExpandedSessions((prev) =>
       prev.includes(sessionId)
-        ? prev.filter(id => id !== sessionId)
-        : [...prev, sessionId]
-    )
-  }, [])
+        ? prev.filter((id) => id !== sessionId)
+        : [...prev, sessionId],
+    );
+  }, []);
 
-  const handleMediaClick = useCallback((media: Media) => {
-    if (!isSelectionMode) {
-      const allMedia = sessions.flatMap(s => s.media)
-      const index = allMedia.findIndex(m => m.id === media.id)
-      setCurrentIndex(index)
-      setExpandedMedia(media)
-    }
-  }, [isSelectionMode, sessions])
+  const handleMediaClick = useCallback(
+    (media: Media) => {
+      if (isSelectionMode) {
+        handleMediaSelect(media.id);
+      } else {
+        const allMedia = sessions.flatMap((s) => s.media);
+        const index = allMedia.findIndex((m) => m.id === media.id);
+        setCurrentIndex(index);
+        setExpandedMedia(media);
+      }
+    },
+    [isSelectionMode, sessions, handleMediaSelect],
+  );
 
   const handlePrevMedia = useCallback(() => {
-    if (!expandedMedia) return
-    const allMedia = sessions.flatMap(s => s.media)
-    setDirection('right')
+    if (!expandedMedia) return;
+    const allMedia = sessions.flatMap((s) => s.media);
+    setDirection("right");
     setCurrentIndex((prevIndex) => {
-      const newIndex = (prevIndex - 1 + allMedia.length) % allMedia.length
-      setExpandedMedia(allMedia[newIndex])
-      return newIndex
-    })
-  }, [expandedMedia, sessions])
+      const newIndex = (prevIndex - 1 + allMedia.length) % allMedia.length;
+      setExpandedMedia(allMedia[newIndex]);
+      return newIndex;
+    });
+  }, [expandedMedia, sessions]);
 
   const handleNextMedia = useCallback(() => {
-    if (!expandedMedia) return
-    const allMedia = sessions.flatMap(s => s.media)
-    setDirection('left')
+    if (!expandedMedia) return;
+    const allMedia = sessions.flatMap((s) => s.media);
+    setDirection("left");
     setCurrentIndex((prevIndex) => {
-      const newIndex = (prevIndex + 1) % allMedia.length
-      setExpandedMedia(allMedia[newIndex])
-      return newIndex
-    })
-  }, [expandedMedia, sessions])
+      const newIndex = (prevIndex + 1) % allMedia.length;
+      setExpandedMedia(allMedia[newIndex]);
+      return newIndex;
+    });
+  }, [expandedMedia, sessions]);
 
   const swipeHandlers = useSwipeable({
     onSwipedLeft: handleNextMedia,
     onSwipedRight: handlePrevMedia,
-    trackMouse: true
-  })
+    trackMouse: true,
+  });
 
   if (isLoading) {
-    return <div className="min-h-screen bg-gray-100 flex items-center justify-center">Loading...</div>
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        Loading...
+      </div>
+    );
   }
 
   return (
@@ -165,7 +200,7 @@ export default function GalleryPage() {
         </Link>
         <h1 className="text-2xl font-bold">Gallery</h1>
         {isSelectionMode ? (
-          <Link href={`/create-post?media=${selectedMedia.join(',')}`} passHref>
+          <Link href={`/create-post?media=${selectedMedia.join(",")}`} passHref>
             <Button disabled={selectedMedia.length === 0}>
               Next ({selectedMedia.length})
             </Button>
@@ -179,7 +214,7 @@ export default function GalleryPage() {
       {sessions.map((session) => (
         <div key={session.id} className="mb-8">
           <div className="flex items-center mb-2">
-            <button 
+            <button
               onClick={() => toggleSession(session.id)}
               className="text-lg font-semibold flex items-center focus:outline-none"
               aria-expanded={expandedSessions.includes(session.id)}
@@ -214,16 +249,22 @@ export default function GalleryPage() {
         </div>
       ))}
       {expandedMedia && (
-        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 overflow-hidden" {...swipeHandlers}>
+        <div
+          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 overflow-hidden"
+          {...swipeHandlers}
+        >
           <div className="relative w-full h-full max-w-4xl max-h-4xl">
-            <div 
+            <div
               className={`absolute inset-0 transition-transform duration-300 ease-out ${
-                direction === 'left' ? '-translate-x-full' : 
-                direction === 'right' ? 'translate-x-full' : ''
+                direction === "left"
+                  ? "-translate-x-full"
+                  : direction === "right"
+                    ? "translate-x-full"
+                    : ""
               }`}
               onTransitionEnd={() => setDirection(null)}
             >
-              {expandedMedia.type === 'photo' ? (
+              {expandedMedia.type === "photo" ? (
                 <Image
                   src={expandedMedia.src}
                   alt={`Expanded photo ${expandedMedia.id}`}
@@ -284,5 +325,5 @@ export default function GalleryPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

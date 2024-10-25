@@ -215,12 +215,24 @@ export default function CreatePostPage() {
   );
 
   const handleShare = useCallback(async () => {
+    const selectedMediaUrls = selectedMedia.map(
+      (media) =>
+        enhancedVersions[selectedMedia.indexOf(media)][
+          selectedVersions[selectedMedia.indexOf(media)]
+        ],
+    );
     if (navigator.share) {
       try {
+        const image = await fetch(
+          "https://firebasestorage.googleapis.com/v0/b/youkol-1dc4b.appspot.com/o/photos%2Fphoto_1729563437792.jpg?alt=media&token=e439430f-2067-4005-89c9-f160ce912bdd",
+        );
+        const blob = await image.blob();
+        const file = new File([blob], "image.jpg", { type: "image/jpeg" });
         await navigator.share({
+          files: [file],
           title: "My Post",
           text: caption,
-          url: "https://yourappdomain.com/post", // Replace with your actual post URL
+          url: selectedMediaUrls[0], // Replace with your actual post URL
         });
         console.log("Shared successfully");
       } catch (error) {
@@ -232,11 +244,27 @@ export default function CreatePostPage() {
     }
   }, [caption]);
 
-  const handleSocialShare = useCallback((platform: string) => {
-    // Implement platform-specific sharing logic here
-    console.log(`Sharing to ${platform}232`);
-    // You would typically open a new window with the platform's share URL
-  }, []);
+  const handleSocialShare = useCallback(
+    (platform: string) => {
+      // Implement platform-specific sharing logic here
+      console.log(`Sharing to ${platform}`);
+      // You would typically open a new window with the platform's share URL
+      console.log("sharing media: ", selectedMedia);
+      const selectedMediaUrls = selectedMedia.map(
+        (media) =>
+          enhancedVersions[selectedMedia.indexOf(media)][
+            selectedVersions[selectedMedia.indexOf(media)]
+          ],
+      );
+      console.log(
+        "sharing media: ",
+        selectedMediaUrls,
+        "with caption: ",
+        caption,
+      );
+    },
+    [selectedMedia, enhancedVersions, selectedVersions, caption],
+  );
 
   const openUserManual = useCallback(() => {
     // Implement logic to open the user manual
