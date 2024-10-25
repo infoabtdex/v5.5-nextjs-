@@ -1,7 +1,32 @@
 import { initializeApp } from 'firebase/app';
 import { getStorage, ref, uploadString, uploadBytes, getDownloadURL, deleteObject, listAll, StorageReference, getMetadata } from 'firebase/storage';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged, User, updateProfile } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, updateDoc, enableIndexedDbPersistence } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  updateDoc, 
+  enableIndexedDbPersistence, 
+  collection, 
+  addDoc, 
+  query, 
+  getDocs, 
+  deleteDoc, 
+  serverTimestamp,
+  where,
+  orderBy,
+  QueryConstraint
+} from 'firebase/firestore';
+
+// Define Media type at the top of the file
+interface Media {
+  id: string;
+  userId: string;
+  src: string;
+  type: 'photo' | 'video';
+  date: Date;
+}
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -50,10 +75,30 @@ export const onAuthStateChange = (callback: (user: User | null) => void): () => 
   return onAuthStateChanged(auth, callback);
 };
 
-export const uploadPhoto = async (photoDataUrl: string, fileName: string): Promise<string> => {
-  const storageRef = ref(storage, `photos/${fileName}`);
-  await uploadString(storageRef, photoDataUrl, 'data_url');
-  return await getDownloadURL(storageRef);
+export const uploadPhoto = async (dataUrl: string, fileName: string) => {
+  const auth = getAuth();
+  const userId = auth.currentUser?.uid;
+  
+  if (!userId) {
+    throw new Error("User not authenticated");
+  }
+
+  const storageRef = ref(storage, `photos/${userId}/${fileName}`);
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  await uploadBytes(storageRef, blob);
+  const downloadUrl = await getDownloadURL(storageRef);
+
+  const mediaRef = collection(db, "media");
+  await addDoc(mediaRef, {
+    userId,
+    id: fileName,
+    src: downloadUrl,
+    type: "photo",
+    date: serverTimestamp(),
+  });
+
+  return downloadUrl;
 };
 
 export const getPhotoUrl = async (fileName: string): Promise<string> => {
@@ -61,9 +106,32 @@ export const getPhotoUrl = async (fileName: string): Promise<string> => {
   return await getDownloadURL(storageRef);
 };
 
-export const deletePhoto = async (fileName: string): Promise<void> => {
-  const storageRef = ref(storage, `photos/${fileName}`);
+export const deletePhoto = async (photoId: string) => {
+  const auth = getAuth();
+  const userId = auth.currentUser?.uid;
+  
+  if (!userId) {
+    throw new Error("User not authenticated");
+  }
+
+  const mediaRef = doc(db, "media", photoId);
+  const mediaDoc = await getDoc(mediaRef);
+  
+  if (!mediaDoc.exists()) {
+    throw new Error("Photo not found");
+  }
+  
+  const mediaData = mediaDoc.data();
+  if (mediaData.userId !== userId) {
+    throw new Error("Unauthorized to delete this photo");
+  }
+
+  // Delete from storage
+  const storageRef = ref(storage, `photos/${userId}/${mediaData.id}`);
   await deleteObject(storageRef);
+  
+  // Delete from Firestore
+  await deleteDoc(mediaRef);
 };
 
 export const getAllPhotos = async (): Promise<{ id: string; src: string; date: Date }[]> => {
@@ -122,46 +190,94 @@ export const updateUserProfile = async (profile: { username: string; email: stri
   await updateDoc(doc(db, 'users', user.uid), profile);
 };
 
-export const uploadVideo = async (videoBlob: Blob, fileName: string): Promise<string> => {
-  const storageRef = ref(storage, `videos/${fileName}`);
-  await uploadBytes(storageRef, videoBlob);
-  return await getDownloadURL(storageRef);
-};
-
-export const deleteVideo = async (fileName: string): Promise<void> => {
-  const storageRef = ref(storage, `videos/${fileName}`);
-  await deleteObject(storageRef);
-};
-
-export const getAllMedia = async (): Promise<{ id: string; src: string; type: 'photo' | 'video'; date: Date }[]> => {
-  const photoStorageRef = ref(storage, 'photos');
-  const videoStorageRef = ref(storage, 'videos');
-  const [photoResult, videoResult] = await Promise.all([listAll(photoStorageRef), listAll(videoStorageRef)]);
+export const uploadVideo = async (blob: Blob, fileName: string) => {
+  const auth = getAuth();
+  const userId = auth.currentUser?.uid;
   
-  const photoPromises = photoResult.items.map(async (itemRef: StorageReference) => {
-    const url = await getDownloadURL(itemRef);
-    const metadata = await getMetadata(itemRef);
-    return {
-      id: itemRef.name,
-      src: url,
-      type: 'photo' as const,
-      date: new Date(metadata.timeCreated)
-    };
+  if (!userId) {
+    throw new Error("User not authenticated");
+  }
+
+  const storageRef = ref(storage, `videos/${userId}/${fileName}`);
+  await uploadBytes(storageRef, blob);
+  const downloadUrl = await getDownloadURL(storageRef);
+
+  const mediaRef = collection(db, "media");
+  await addDoc(mediaRef, {
+    userId,
+    id: fileName,
+    src: downloadUrl,
+    type: "video",
+    date: serverTimestamp(),
   });
 
-  const videoPromises = videoResult.items.map(async (itemRef: StorageReference) => {
-    const url = await getDownloadURL(itemRef);
-    const metadata = await getMetadata(itemRef);
-    return {
-      id: itemRef.name,
-      src: url,
-      type: 'video' as const,
-      date: new Date(metadata.timeCreated)
-    };
-  });
+  return downloadUrl;
+};
 
-  const allMedia = await Promise.all([...photoPromises, ...videoPromises]);
-  return allMedia.sort((a, b) => b.date.getTime() - a.date.getTime());
+export const deleteVideo = async (videoId: string) => {
+  const auth = getAuth();
+  const userId = auth.currentUser?.uid;
+  
+  if (!userId) {
+    throw new Error("User not authenticated");
+  }
+
+  const mediaRef = doc(db, "media", videoId);
+  const mediaDoc = await getDoc(mediaRef);
+  
+  if (!mediaDoc.exists()) {
+    throw new Error("Video not found");
+  }
+  
+  const mediaData = mediaDoc.data();
+  if (mediaData.userId !== userId) {
+    throw new Error("Unauthorized to delete this video");
+  }
+
+  // Delete from storage
+  const storageRef = ref(storage, `videos/${userId}/${mediaData.id}`);
+  await deleteObject(storageRef);
+  
+  // Delete from Firestore
+  await deleteDoc(mediaRef);
+};
+
+export const getAllMedia = async (): Promise<Media[]> => {
+  const auth = getAuth();
+  const userId = auth.currentUser?.uid;
+  
+  if (!userId) {
+    throw new Error("User not authenticated");
+  }
+
+  try {
+    const mediaRef = collection(db, "media");
+    // First try without orderBy to see if we can get the data
+    const q = query(
+      mediaRef,
+      where("userId", "==", userId)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const media = querySnapshot.docs.map((doc) => ({
+      ...doc.data(),
+      id: doc.id,
+      date: doc.data().date?.toDate() || new Date(),
+    })) as Media[];
+
+    // Sort the results in memory instead of using orderBy
+    return media.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  } catch (error: any) {
+    console.error('Error in getAllMedia:', error);
+    if (error.code) {
+      console.error('Error code:', error.code);
+    }
+    if (error.message) {
+      console.error('Error message:', error.message);
+    }
+    throw error;
+  }
 };
 
 export const getMediaUrl = async (fileName: string): Promise<string> => {
@@ -170,3 +286,6 @@ export const getMediaUrl = async (fileName: string): Promise<string> => {
   const storageRef = ref(storage, `${folder}/${fileName}`);
   return await getDownloadURL(storageRef);
 };
+
+// Export the Media type at the end
+export type { Media };

@@ -22,13 +22,9 @@ import {
 } from "@/services/firebaseService";
 import Image from "next/image";
 import { useSwipeable } from "react-swipeable";
-
-interface Media {
-  id: string;
-  src: string;
-  type: "photo" | "video";
-  date: Date;
-}
+import { type Media } from "@/services/firebaseService";
+import { useRouter } from "next/navigation";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 interface Session {
   id: string;
@@ -64,6 +60,7 @@ const groupMediaByDate = (media: Media[]): Session[] => {
 };
 
 export default function GalleryPage() {
+  const router = useRouter();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedMedia, setSelectedMedia] = useState<string[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -72,25 +69,9 @@ export default function GalleryPage() {
   const [expandedMedia, setExpandedMedia] = useState<Media | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [direction, setDirection] = useState<"left" | "right" | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchMedia = async () => {
-      setIsLoading(true);
-      try {
-        const fetchedMedia = await getAllMedia();
-        const groupedSessions = groupMediaByDate(fetchedMedia);
-        setSessions(groupedSessions);
-        setExpandedSessions([groupedSessions[0]?.id].filter(Boolean));
-      } catch (error) {
-        console.error("Error fetching media:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchMedia();
-  }, []);
-
+  // All callback hooks
   const handleMediaSelect = useCallback((mediaId: string) => {
     setSelectedMedia((prev) =>
       prev.includes(mediaId)
@@ -114,7 +95,6 @@ export default function GalleryPage() {
           }))
           .filter((session) => session.media.length > 0),
       );
-      // Close the expanded view after deletion
       setExpandedMedia(null);
     } catch (error) {
       console.error("Error deleting media:", error);
@@ -122,12 +102,10 @@ export default function GalleryPage() {
   }, []);
 
   const handleEdit = useCallback((mediaId: string) => {
-    // Implement edit functionality
     console.log("Edit media:", mediaId);
   }, []);
 
   const handleShare = useCallback((mediaId: string) => {
-    // Implement share functionality
     console.log("Share media:", mediaId);
   }, []); 
 
@@ -181,10 +159,52 @@ export default function GalleryPage() {
     trackMouse: true,
   });
 
+  // Effect hook for authentication and data fetching
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        console.log("No authenticated user");
+        router.push('/auth/login-signup');
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const fetchedMedia = await getAllMedia();
+        console.log("Fetched media:", fetchedMedia);
+        const groupedSessions = groupMediaByDate(fetchedMedia);
+        setSessions(groupedSessions);
+        setExpandedSessions([groupedSessions[0]?.id].filter(Boolean));
+      } catch (error) {
+        console.error("Error fetching media:", error);
+        setAuthError(error instanceof Error ? error.message : "Error fetching media");
+      } finally {
+        setIsLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  // Early returns for loading and error states
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         Loading...
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">{authError}</p>
+          <Button onClick={() => router.push('/auth/login-signup')}>
+            Return to Login
+          </Button>
+        </div>
       </div>
     );
   }
@@ -265,12 +285,16 @@ export default function GalleryPage() {
               onTransitionEnd={() => setDirection(null)}
             >
               {expandedMedia.type === "photo" ? (
-                <Image
-                  src={expandedMedia.src}
-                  alt={`Expanded photo ${expandedMedia.id}`}
-                  layout="fill"
-                  objectFit="contain"
-                />
+                <div className="relative w-full h-full">
+                  <Image
+                    src={expandedMedia.src}
+                    alt={`Expanded photo ${expandedMedia.id}`}
+                    fill
+                    sizes="100vw"
+                    className="object-contain"
+                    priority
+                  />
+                </div>
               ) : (
                 <video
                   src={expandedMedia.src}
