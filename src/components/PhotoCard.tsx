@@ -2,24 +2,23 @@ import React, { useRef, useEffect } from 'react'
 import Image from 'next/image'
 import { Button } from "@/components/ui/button"
 import { Play } from 'lucide-react'
+import { type Media } from '@/services/firebaseService'
 
 interface PhotoCardProps {
-  src: string
-  alt: string
-  type: 'photo' | 'video'
-  isSelectable: boolean
-  isSelected: boolean
-  onSelect: () => void
-  onClick: () => void
-  onDelete: () => void
-  onEdit: () => void
-  onShare: () => void
+  media: Media;
+  LazyImage?: React.ComponentType<any>;
+  isSelectable: boolean;
+  isSelected: boolean;
+  onSelect: () => void;
+  onClick: () => void;
+  onDelete: () => void;
+  onEdit: () => void;
+  onShare: () => void;
 }
 
 const PhotoCard: React.FC<PhotoCardProps> = ({
-  src,
-  alt,
-  type,
+  media,
+  LazyImage,
   isSelectable,
   isSelected,
   onSelect,
@@ -30,39 +29,32 @@ const PhotoCard: React.FC<PhotoCardProps> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null)
 
-  // Preload image
   useEffect(() => {
-    if (type === 'photo') {
-      const img = document.createElement('img');
-      img.src = src;
-    }
-  }, [src, type]);
-
-  useEffect(() => {
-    if (type === 'video' && videoRef.current) {
+    if (media.type === 'video' && videoRef.current) {
       videoRef.current.currentTime = 0
     }
-  }, [type])
+  }, [media.type])
+
+  const ImageComponent = LazyImage || Image;
 
   return (
     <div 
       className="relative aspect-square overflow-hidden rounded-lg cursor-pointer"
       onClick={onClick}
     >
-      {type === 'photo' ? (
-        <Image
-          src={src}
-          alt={alt}
+      {media.type === 'photo' ? (
+        <ImageComponent
+          src={media.src}
+          alt={`Photo taken on ${media.date.toLocaleDateString()}`}
           fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          className="object-cover"
-          priority={false}
+          sizes="(max-width: 768px) 50vw, 25vw"
+          className="object-cover rounded-lg"
         />
       ) : (
         <>
           <video
             ref={videoRef}
-            src={src}
+            src={media.src}
             className="w-full h-full object-cover"
             preload="metadata"
           />

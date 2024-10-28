@@ -16,6 +16,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useVirtualizer } from '@tanstack/react-virtual';
 import dynamic from 'next/dynamic';
+import { imageCache } from '@/services/imageCache';
+import { useInView } from 'react-intersection-observer';
 
 // Dynamically import PhotoCard with no SSR
 const PhotoCard = dynamic(() => import('@/components/PhotoCard'), {
@@ -76,6 +78,43 @@ interface VirtualItem {
   size: number;
   lane: number;
 }
+
+// Update the LazyImage component
+const LazyImage = React.memo(({ src, alt, ...props }: { src: string; alt: string; [key: string]: any }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const { ref, inView } = useInView({
+    triggerOnce: true,
+    rootMargin: '200px 0px',
+  });
+
+  useEffect(() => {
+    if (inView) {
+      const img = document.createElement('img');
+      img.src = src;
+      img.onload = () => setIsLoaded(true);
+    }
+  }, [inView, src]);
+
+  return (
+    <div ref={ref} className="relative w-full h-full">
+      {inView && (
+        <Image
+          src={src}
+          alt={alt}
+          {...props}
+          className={`transition-opacity duration-300 ${
+            isLoaded ? 'opacity-100' : 'opacity-0'
+          } ${props.className || ''}`}
+        />
+      )}
+      {(!isLoaded || !inView) && (
+        <div className="absolute inset-0 bg-gray-200 animate-pulse rounded-lg" />
+      )}
+    </div>
+  );
+});
+
+LazyImage.displayName = 'LazyImage';
 
 export default function GalleryPage() {
   const router = useRouter();
@@ -228,6 +267,21 @@ export default function GalleryPage() {
     return () => unsubscribe();
   }, [router]);
 
+  // Add this effect for preloading
+  useEffect(() => {
+    if (sessions.length > 0) {
+      // Preload first visible session immediately
+      const firstSessionMedia = sessions[0].media.slice(0, 8);
+      imageCache.preloadBatch(firstSessionMedia.map(m => m.src));
+
+      // Preload other sessions progressively
+      const otherMedia = sessions.slice(1).flatMap(s => s.media.map(m => m.src));
+      setTimeout(() => {
+        imageCache.preloadBatch(otherMedia);
+      }, 1000);
+    }
+  }, [sessions]);
+
   // Early returns for loading and error states
   if (isLoading) {
     return (
@@ -309,9 +363,8 @@ export default function GalleryPage() {
                     {session.media.map((media) => (
                       <PhotoCard
                         key={media.id}
-                        src={media.src}
-                        alt={`Photo ${media.id}`}
-                        type={media.type}
+                        media={media}
+                        LazyImage={LazyImage} // Pass the simplified LazyImage component
                         isSelectable={isSelectionMode}
                         isSelected={selectedMedia.includes(media.id)}
                         onSelect={() => handleMediaSelect(media.id)}
