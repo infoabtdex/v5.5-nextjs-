@@ -329,14 +329,18 @@ export const getAllMedia = async (): Promise<Media[]> => {
   }
 };
 
-export const getMediaUrl = async (fileName: string): Promise<string> => {
-  const isPhoto = fileName.startsWith('photo_');
-  const folder = isPhoto ? 'photos' : 'videos';
-  const storageRef = ref(storage, `${folder}/${fileName}`);
-  return await getDownloadURL(storageRef);
+export const getMediaUrl = async (storagePath: string): Promise<string> => {
+  try {
+    const storageRef = ref(storage, storagePath);
+    const url = await getDownloadURL(storageRef);
+    return url;
+  } catch (error) {
+    console.error("Error getting media URL:", error);
+    throw error;
+  }
 };
 
 // Export the Media type at the end
 export type { Media };
-
-export { auth };
+// Add db to the exports at the bottom of the file
+export { auth, db };

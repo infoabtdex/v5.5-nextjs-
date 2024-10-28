@@ -20,8 +20,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import dynamic from "next/dynamic";
-import { getMediaUrl } from "@/services/firebaseService";
-
+import { getMediaUrl, auth } from "@/services/firebaseService";
+import { useRouter } from "next/navigation";
+import { getDoc, doc } from "firebase/firestore";
+import { db } from "@/services/firebaseService";
 const Image = dynamic(() => import("next/image"), { ssr: false });
 
 interface Media {
@@ -54,8 +56,9 @@ const EnhancedVersionButton = React.memo(
         <Image
           src={version}
           alt={`Enhanced version`}
-          layout="fill"
-          objectFit="cover"
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          className="object-cover"
           loading="lazy"
         />
         {isSelected && (
@@ -171,28 +174,54 @@ export default function CreatePostPage() {
   const [enhancedVersions, setEnhancedVersions] = useState<string[][]>([]);
   const [selectedVersions, setSelectedVersions] = useState<number[]>([]);
   const [caption, setCaption] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
     const fetchMedia = async () => {
+      const userId = auth.currentUser?.uid;
+      
+      if (!userId) {
+        console.error("No authenticated user");
+        router.push('/auth/login-signup');
+        return;
+      }
+
       const mediaIds = searchParams?.get("media")?.split(",") || [];
-      const media = await Promise.all(
-        mediaIds.map(
-          async (id): Promise<Media> => ({
-            id,
-            src: await getMediaUrl(id),
-            type: id.startsWith("photo_") ? "photo" : "video",
+      
+      try {
+        const media = await Promise.all(
+          mediaIds.map(async (id): Promise<Media> => {
+            // Get the media document from Firestore first
+            const mediaDoc = await getDoc(doc(db, "media", id));
+            if (!mediaDoc.exists()) {
+              throw new Error(`Media document ${id} not found`);
+            }
+            
+            const mediaData = mediaDoc.data();
+            const storagePath = mediaData.type === "photo"
+              ? `photos/${userId}/${mediaData.id}`
+              : `videos/${userId}/${mediaData.id}`;
+            
+            return {
+              id,
+              src: await getMediaUrl(storagePath),
+              type: mediaData.type,
+            };
           }),
-        ),
-      );
-      setSelectedMedia(media);
-      const enhanced = media.map(
-        (item) => [item.src, item.src, item.src], // Generate 3 versions for both photos and videos
-      );
-      setEnhancedVersions(enhanced);
-      setSelectedVersions(new Array(media.length).fill(0)); // Select the first version by default
+        );
+        setSelectedMedia(media);
+        const enhanced = media.map(
+          (item) => [item.src, item.src, item.src],
+        );
+        setEnhancedVersions(enhanced);
+        setSelectedVersions(new Array(media.length).fill(0));
+      } catch (error) {
+        console.error("Error fetching media:", error);
+        // Handle error appropriately
+      }
     };
     fetchMedia();
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const handleRegenerateVersion = useCallback(
     (imageIndex: number, versionIndex: number) => {
