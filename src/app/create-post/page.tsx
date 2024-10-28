@@ -406,10 +406,10 @@ export default function CreatePostPage() {
                 <Image
                   src={enhancedVersions[index][selectedVersions[index]]}
                   alt={`Selected photo ${index + 1}`}
-                  layout="fill"
-                  objectFit="cover"
-                  className="rounded-lg"
-                  loading="lazy"
+                  fill
+                  sizes="(max-width: 768px) 50vw, 33vw"
+                  className="rounded-lg object-cover"
+                  priority
                 />
               ) : (
                 <video
