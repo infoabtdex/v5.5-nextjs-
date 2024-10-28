@@ -11,6 +11,17 @@ const nextConfig = {
       },
     ],
   },
+  // Add output configuration
+  output: 'standalone',
+  // Optimize build
+  experimental: {
+    optimizeCss: true,
+    optimizePackageImports: ['lucide-react'],
+  },
+  // Cache configuration
+  generateBuildId: async () => {
+    return 'build-' + Date.now()
+  },
   async headers() {
     return [
       {
