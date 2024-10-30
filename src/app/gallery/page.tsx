@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -116,6 +116,16 @@ const LazyImage = React.memo(({ src, alt, ...props }: { src: string; alt: string
 
 LazyImage.displayName = 'LazyImage';
 
+// Add a cache for media URLs
+const mediaUrlCache = new Map<string, string>();
+
+// Update the preloadImage function
+const preloadImage = (src: string) => {
+  if (typeof window === 'undefined') return;
+  const img = new window.Image(1, 1);
+  img.src = src;
+};
+
 export default function GalleryPage() {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -131,6 +141,12 @@ export default function GalleryPage() {
   const [direction, setDirection] = useState<"left" | "right" | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [visibleSessions, setVisibleSessions] = useState<Session[]>([]);
+
+  // Memoize the flattened media array
+  const allMedia = useMemo(() => 
+    sessions.flatMap(s => s.media),
+    [sessions]
+  );
 
   // Initialize virtualizer after sessions state is declared
   const rowVirtualizer = useVirtualizer({
@@ -190,25 +206,36 @@ export default function GalleryPage() {
   }, []); 
 
   const toggleSession = useCallback((sessionId: string) => {
-    setExpandedSessions((prev) =>
-      prev.includes(sessionId)
+    setExpandedSessions((prev) => {
+      const newExpanded = prev.includes(sessionId)
         ? prev.filter((id) => id !== sessionId)
-        : [...prev, sessionId],
-    );
-  }, []);
+        : [...prev, sessionId];
+      
+      // Preload images for newly expanded session
+      if (!prev.includes(sessionId)) {
+        const session = sessions.find(s => s.id === sessionId);
+        if (session) {
+          session.media
+            .filter(m => m.type === 'photo')
+            .slice(0, 8) // Preload first 8 images
+            .forEach(m => preloadImage(m.src));
+        }
+      }
+      return newExpanded;
+    });
+  }, [sessions]);
 
   const handleMediaClick = useCallback(
     (media: Media) => {
       if (isSelectionMode) {
         handleMediaSelect(media.id);
       } else {
-        const allMedia = sessions.flatMap((s) => s.media);
         const index = allMedia.findIndex((m) => m.id === media.id);
         setCurrentIndex(index);
         setExpandedMedia(media);
       }
     },
-    [isSelectionMode, sessions, handleMediaSelect],
+    [isSelectionMode, allMedia, handleMediaSelect],
   );
 
   const handlePrevMedia = useCallback(() => {
@@ -281,6 +308,19 @@ export default function GalleryPage() {
       }, 1000);
     }
   }, [sessions]);
+
+  // Preload adjacent images when a media item is expanded
+  useEffect(() => {
+    if (!expandedMedia) return;
+    
+    const currentIndex = allMedia.findIndex(m => m.id === expandedMedia.id);
+    const prevIndex = (currentIndex - 1 + allMedia.length) % allMedia.length;
+    const nextIndex = (currentIndex + 1) % allMedia.length;
+    
+    // Preload previous and next images
+    if (allMedia[prevIndex].type === 'photo') preloadImage(allMedia[prevIndex].src);
+    if (allMedia[nextIndex].type === 'photo') preloadImage(allMedia[nextIndex].src);
+  }, [expandedMedia, allMedia]);
 
   // Early returns for loading and error states
   if (isLoading) {

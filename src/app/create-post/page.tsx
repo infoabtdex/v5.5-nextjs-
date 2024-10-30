@@ -167,6 +167,15 @@ const EnhancedVideoButton = React.memo(
 
 EnhancedVideoButton.displayName = "EnhancedVideoButton";
 
+const mediaCache = new Map<string, Media>();
+const enhancedVersionsCache = new Map<string, string[]>();
+
+const preloadImage = (src: string) => {
+  if (typeof window === 'undefined') return;
+  const img = new window.Image(1, 1);
+  img.src = src;
+};
+
 export default function CreatePostPage() {
   const searchParams = useSearchParams();
   const [selectedMedia, setSelectedMedia] = useState<Media[]>([]);
@@ -176,52 +185,85 @@ export default function CreatePostPage() {
   const [caption, setCaption] = useState("");
   const router = useRouter();
 
-  useEffect(() => {
-    const fetchMedia = async () => {
-      const userId = auth.currentUser?.uid;
-      
-      if (!userId) {
-        console.error("No authenticated user");
-        router.push('/auth/login-signup');
-        return;
-      }
+  const fetchMedia = useCallback(async () => {
+    const userId = auth.currentUser?.uid;
+    
+    if (!userId) {
+      console.error("No authenticated user");
+      router.push('/auth/login-signup');
+      return;
+    }
 
-      const mediaIds = searchParams?.get("media")?.split(",") || [];
-      
-      try {
-        const media = await Promise.all(
-          mediaIds.map(async (id): Promise<Media> => {
-            // Get the media document from Firestore first
-            const mediaDoc = await getDoc(doc(db, "media", id));
-            if (!mediaDoc.exists()) {
-              throw new Error(`Media document ${id} not found`);
-            }
-            
-            const mediaData = mediaDoc.data();
-            const storagePath = mediaData.type === "photo"
-              ? `photos/${userId}/${mediaData.id}`
-              : `videos/${userId}/${mediaData.id}`;
-            
-            return {
-              id,
-              src: await getMediaUrl(storagePath),
-              type: mediaData.type,
-            };
-          }),
-        );
-        setSelectedMedia(media);
-        const enhanced = media.map(
-          (item) => [item.src, item.src, item.src],
-        );
-        setEnhancedVersions(enhanced);
-        setSelectedVersions(new Array(media.length).fill(0));
-      } catch (error) {
-        console.error("Error fetching media:", error);
-        // Handle error appropriately
-      }
-    };
-    fetchMedia();
+    const mediaIds = searchParams?.get("media")?.split(",") || [];
+    
+    try {
+      const media = await Promise.all(
+        mediaIds.map(async (id): Promise<Media> => {
+          // Check cache first
+          if (mediaCache.has(id)) {
+            return mediaCache.get(id)!;
+          }
+
+          const mediaDoc = await getDoc(doc(db, "media", id));
+          if (!mediaDoc.exists()) {
+            throw new Error(`Media document ${id} not found`);
+          }
+          
+          const mediaData = mediaDoc.data();
+          const storagePath = mediaData.type === "photo"
+            ? `photos/${userId}/${mediaData.id}`
+            : `videos/${userId}/${mediaData.id}`;
+          
+          const url = await getMediaUrl(storagePath);
+          const mediaItem = {
+            id,
+            src: url,
+            type: mediaData.type as "photo" | "video",
+          };
+
+          // Cache the media item
+          mediaCache.set(id, mediaItem);
+          
+          // Preload the image if it's a photo
+          if (mediaData.type === "photo") {
+            preloadImage(url);
+          }
+
+          return mediaItem;
+        }),
+      );
+
+      setSelectedMedia(media);
+
+      // Generate and cache enhanced versions
+      const enhanced = await Promise.all(
+        media.map(async (item) => {
+          if (enhancedVersionsCache.has(item.id)) {
+            return enhancedVersionsCache.get(item.id)!;
+          }
+
+          const versions = [item.src, item.src, item.src];
+          enhancedVersionsCache.set(item.id, versions);
+          
+          // Preload enhanced versions if they're photos
+          if (item.type === "photo") {
+            versions.forEach(preloadImage);
+          }
+
+          return versions;
+        })
+      );
+
+      setEnhancedVersions(enhanced);
+      setSelectedVersions(new Array(media.length).fill(0));
+    } catch (error) {
+      console.error("Error fetching media:", error);
+    }
   }, [searchParams, router]);
+
+  useEffect(() => {
+    fetchMedia();
+  }, [fetchMedia]);
 
   const handleRegenerateVersion = useCallback(
     (imageIndex: number, versionIndex: number) => {
