@@ -327,58 +327,42 @@ export default function GalleryPage() {
         )}
       </div>
       <div ref={containerRef} className="h-[calc(100vh-100px)] overflow-auto">
-        <div
-          style={{
-            height: `${rowVirtualizer.getTotalSize()}px`,
-            width: '100%',
-            position: 'relative',
-          }}
-        >
-          {rowVirtualizer.getVirtualItems().map((virtualRow: VirtualItem) => {
-            const session = sessions[virtualRow.index];
-            return (
-              <div
-                key={session.id}
-                className="mb-8 absolute top-0 left-0 w-full"
-                style={{
-                  transform: `translateY(${virtualRow.start}px)`,
-                }}
-              >
-                <div className="flex items-center mb-2">
-                  <button
-                    onClick={() => toggleSession(session.id)}
-                    className="text-lg font-semibold flex items-center focus:outline-none"
-                    aria-expanded={expandedSessions.includes(session.id)}
-                  >
-                    {expandedSessions.includes(session.id) ? (
-                      <ChevronDown className="h-5 w-5 mr-1" />
-                    ) : (
-                      <ChevronRight className="h-5 w-5 mr-1" />
-                    )}
-                    {session.date}
-                  </button>
-                </div>
-                {expandedSessions.includes(session.id) && (
-                  <div className="grid grid-cols-4 gap-4">
-                    {session.media.map((media) => (
-                      <PhotoCard
-                        key={media.id}
-                        media={media}
-                        LazyImage={LazyImage} // Pass the simplified LazyImage component
-                        isSelectable={isSelectionMode}
-                        isSelected={selectedMedia.includes(media.id)}
-                        onSelect={() => handleMediaSelect(media.id)}
-                        onDelete={() => handleDelete(media)}
-                        onEdit={() => handleEdit(media.id)}
-                        onShare={() => handleShare(media.id)}
-                        onClick={() => handleMediaClick(media)}
-                      />
-                    ))}
-                  </div>
-                )}
+        <div className="space-y-1">
+          {sessions.map((session) => (
+            <div key={session.id}>
+              <div className="flex items-center">
+                <button
+                  onClick={() => toggleSession(session.id)}
+                  className="text-lg font-semibold flex items-center focus:outline-none hover:bg-gray-200 rounded-lg px-2 py-1 transition-colors"
+                >
+                  {expandedSessions.includes(session.id) ? (
+                    <ChevronDown className="h-5 w-5 mr-1" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 mr-1" />
+                  )}
+                  {session.date}
+                </button>
               </div>
-            );
-          })}
+              {expandedSessions.includes(session.id) && (
+                <div className="grid grid-cols-4 gap-2 px-2 pt-1 pb-2">
+                  {session.media.map((media) => (
+                    <PhotoCard
+                      key={media.id}
+                      media={media}
+                      LazyImage={LazyImage}
+                      isSelectable={isSelectionMode}
+                      isSelected={selectedMedia.includes(media.id)}
+                      onSelect={() => handleMediaSelect(media.id)}
+                      onDelete={() => handleDelete(media)}
+                      onEdit={() => handleEdit(media.id)}
+                      onShare={() => handleShare(media.id)}
+                      onClick={() => handleMediaClick(media)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
       {expandedMedia && (
